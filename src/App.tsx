@@ -4,6 +4,7 @@ import type { RoundStatus, RunState, Song } from './types'
 import { MAX_GUESSES, STAGES, formatSeconds, nextStageSeconds, roundContinues, scoreFor, tierInfo } from './game/rules'
 import { pickRun, randomRunKey } from './game/daily'
 import { player } from './game/audio'
+import { clipProgress } from './game/timeline'
 import { isSameSong, normalize, songLabel } from './game/match'
 import { loadFilter, loadRun, recordFinish, saveFilter, saveRun } from './game/storage'
 import { perfectCount, runScore, solvedAtStage } from './game/share'
@@ -17,6 +18,7 @@ import { Summary } from './components/Summary'
 import { HowTo } from './components/HowTo'
 import { StatsModal } from './components/StatsModal'
 import { CategoryPicker } from './components/CategoryPicker'
+import { PlayButton } from './components/PlayButton'
 
 const SONGS = songsData as unknown as Song[]
 
@@ -274,6 +276,15 @@ export default function App() {
     )
   }
 
+  /*
+   * Soiton eteneminen 0…1 NYKYISESTÄ klipistä. Tämä on eri asia kuin
+   * aikajanan soittopää: jana näyttää kuinka pitkälle biisiin on avattu
+   * (0,2 s on 1,3 % viidestätoista sekunnista), rengas kuinka pitkällä tämä
+   * toisto on. Ilman rengasta lyhyt vihje näyttäisi siltä ettei mikään liiku.
+   */
+  const clipDuration = revealed ? STAGES[STAGES.length - 1] : STAGES[stageIndex]
+  const progress = clipProgress(elapsed, clipDuration)
+
   const info = song ? tierInfo(song.tier) : null
   const solvedStage = run ? solvedAtStage(run, run.current) : -1
   const roundPoints = song && solvedStage >= 0 ? scoreFor(song.tier, solvedStage) : 0
@@ -354,29 +365,12 @@ export default function App() {
               <StageBar stageIndex={stageIndex} elapsed={elapsed} />
 
               <div className="play-row">
-                <button
-                  className={`play-btn${playing ? ' playing' : ''}`}
+                <PlayButton
+                  playing={playing}
+                  loading={loading}
+                  progress={progress}
                   onClick={handlePlay}
-                  disabled={loading}
-                  aria-label={playing ? 'Pysäytä' : 'Soita vihje'}
-                >
-                  {loading ? (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                      <path d="M12 3a9 9 0 1 0 9 9" opacity="0.9">
-                        <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite" />
-                      </path>
-                    </svg>
-                  ) : playing ? (
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-                      <rect x="6" y="5" width="4" height="14" rx="1.2" />
-                      <rect x="14" y="5" width="4" height="14" rx="1.2" />
-                    </svg>
-                  ) : (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M8 5.6c0-.9 1-1.5 1.8-1L18 11c.7.5.7 1.5 0 2l-8.2 5.4c-.8.5-1.8-.1-1.8-1V5.6z" />
-                    </svg>
-                  )}
-                </button>
+                />
 
                 <div className="play-meta">
                   <strong>

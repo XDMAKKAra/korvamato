@@ -10,7 +10,7 @@ import { MAX_GUESSES, MAX_SCORE, STAGES, TIERS, nextStageSeconds, roundContinues
 import { dateKey, pickRun, puzzleNumber } from '../src/game/daily'
 import { isSameSong, normalize, searchSongs, songLabel } from '../src/game/match'
 import { buildShareText, runScore, solvedAtStage } from '../src/game/share'
-import { AXIS_SECONDS, headPercent, secondsToPercent, ticks, unlockedPercent } from '../src/game/timeline'
+import { AXIS_SECONDS, clipProgress, headPercent, secondsToPercent, ticks, unlockedPercent } from '../src/game/timeline'
 import { ERAS, GENRES, filterKey, filterLabel, filterSongs } from '../src/game/categories'
 
 const SONGS = songsData as unknown as Song[]
@@ -191,6 +191,31 @@ check('nykyisen vihjeen luku näytetään aina, myös ahtaimmassa kohdassa',
 
 check('0,5 s jää nimeämättä kun se ei ole nykyinen vihje',
   ticks(0)[1].labelled === false, `labelled=${ticks(0)[1].labelled}`)
+
+// Soittonapin rengas. Aikajanan soittopää ei voi näyttää lyhyen vihjeen
+// etenemistä (0,2 s on 1,3 % janasta eli pari pikseliä), joten rengas kiertää
+// aina täyden kierroksen klipin aikana. Ilman tätä lyhyt vihje näyttää siltä
+// ettei mikään liiku – juuri se oli bugiraportti.
+check('rengas on tyhjä klipin alussa jokaisella vihjeellä',
+  STAGES.every((s) => clipProgress(0, s) === 0), 'kaikki vihjeet')
+
+check('rengas on täysi klipin lopussa jokaisella vihjeellä',
+  STAGES.every((s) => clipProgress(s, s) === 1),
+  STAGES.map((s) => `${s}s:${clipProgress(s, s)}`).join(' '))
+
+check('rengas on puolivälissä klipin puolivälissä jokaisella vihjeellä',
+  STAGES.every((s) => approx(clipProgress(s / 2, s), 0.5, 0.001)),
+  STAGES.map((s) => `${s}s:${clipProgress(s / 2, s).toFixed(2)}`).join(' '))
+
+check('rengas etenee lineaarisesti myös lyhyimmällä 0,2 s vihjeellä',
+  [0.25, 0.5, 0.75].every((f) => approx(clipProgress(STAGES[0] * f, STAGES[0]), f, 0.001)),
+  [0.25, 0.5, 0.75].map((f) => `${(f * 100).toFixed(0)}%:${clipProgress(STAGES[0] * f, STAGES[0]).toFixed(2)}`).join(' '))
+
+check('rengas ei ylitä täyttä eikä mene negatiiviseksi',
+  clipProgress(99, 0.2) === 1 && clipProgress(-5, 0.2) === 0, 'rajattu 0..1')
+
+check('rengas on tyhjä kun mikään ei soi', clipProgress(null, 0.2) === 0, 'null')
+check('nollapituinen klippi ei kaada laskentaa', clipProgress(1, 0) === 0, '0 s')
 
 /* ---------- 4. haku ---------- */
 

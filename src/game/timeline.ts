@@ -63,3 +63,17 @@ export function ticks(stageIndex: number, minGapPercent = 8): Tick[] {
     return { seconds, percent, labelled }
   })
 }
+
+/**
+ * Soiton eteneminen 0…1 nykyisestä klipistä.
+ *
+ * Tämä on eri asia kuin `headPercent`: jana kertoo kuinka pitkälle biisiin on
+ * avattu (0,2 s on 1,3 % viidentoista sekunnin janasta), tämä kuinka pitkällä
+ * yksittäinen toisto on. Soittonapin ympärillä kiertävä rengas käyttää tätä,
+ * jolloin lyhyestäkin vihjeestä näkee että se etenee.
+ */
+export function clipProgress(elapsedSeconds: number | null, clipDuration: number): number {
+  if (elapsedSeconds === null || !Number.isFinite(elapsedSeconds)) return 0
+  if (!Number.isFinite(clipDuration) || clipDuration <= 0) return 0
+  return Math.max(0, Math.min(1, elapsedSeconds / clipDuration))
+}
