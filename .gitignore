@@ -1,0 +1,22 @@
+node_modules
+dist
+.DS_Store
+*.local
+*.log
+
+# Rajapintojen tunnukset – ei koskaan versionhallintaan
+.env
+.env.*
+!.env.example
+
+# Hakuputken välimuistit ja välitulokset. Johdettua dataa, satoja megatavuja,
+# ja uudelleen haettavissa milloin tahansa – lopputuote on src/data/songs.json.
+data/.itunes-cache.json
+data/.deezer-cache.json
+data/.spotify-cache.json
+data/.lastfm-cache.json
+data/.language-cache.json
+data/.pipeline-*.json
+
+# Vercel
+.vercel

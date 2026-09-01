@@ -1,0 +1,565 @@
+/**
+ * Korvamato – minimalistinen, Swiss-henkinen ulkoasu.
+ *
+ * Yksi kapea keskitetty pylväs, selkeä typografinen hierarkia ja johdonmukainen
+ * välistysasteikko. Ei koristegradientteja, ei turhaa liikettä: kerrallaan
+ * näkyvissä on yksi asia, ja se on soitin.
+ *
+ * Kaikki välit tulevat --space-* -asteikosta, jotta pystyrytmi pysyy samana
+ * komponentista toiseen. Älä kirjoita irrallisia pikseliarvoja väleihin.
+ */
+
+:root {
+  /* pinta ja teksti */
+  --bg: #0b0b14;
+  --surface: #15151f;
+  --surface-2: #1c1c28;
+  --surface-3: #252533;
+  --border: #272733;
+  --border-strong: #34344a;
+  --text: #eceef5;
+  --muted: #8b90a3;
+
+  /* korostus */
+  --accent: #7c5cff;
+  --accent-soft: rgba(124, 92, 255, 0.14);
+  --ok: #4ade80;
+  --bad: #f4415e;
+  --warn: #fbbf24;
+
+  /* välistysasteikko */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* pyöristykset */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-full: 999px;
+
+  color-scheme: dark;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; min-height: 100%; }
+body { background: var(--bg); color: var(--text); line-height: 1.5; }
+button { font: inherit; color: inherit; cursor: pointer; border: none; background: none; }
+button:disabled { cursor: not-allowed; }
+input { font: inherit; color: inherit; }
+
+/* Näkyvä fokus kaikkialle – ilman tätä näppäimistökäyttö on mahdotonta. */
+:where(button, input, a, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* kehys: kapea keskitetty pylväs, väljä pystyrytmi */
+.app {
+  max-width: 460px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* otsikkorivi */
+.top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.brand { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.brand h1 {
+  margin: 0;
+  font-family: 'Righteous', 'Poppins', system-ui, sans-serif;
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+}
+.brand .sub {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.top-actions { display: flex; gap: var(--space-2); flex: none; }
+
+/* 40px kosketuskohde, 8px väli – täyttää minimit myös mobiilissa */
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+.icon-btn:hover { color: var(--text); background: var(--surface-3); border-color: var(--border-strong); }
+
+/* tilavalitsin: kaksi vaihtoehtoa, liukuva valinta */
+.mode-switch {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.mode-switch button {
+  flex: 1;
+  min-height: 40px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: background 0.2s, color 0.2s;
+}
+.mode-switch button:hover:not(.on) { color: var(--text); }
+.mode-switch button.on { background: var(--surface-3); color: var(--text); }
+
+/*
+ * Kategoriavalitsin.
+ *
+ * Painikerivit alasvetovalikoiden sijaan: vaihtoehtoja on vain neljä ja kolme,
+ * joten ne mahtuvat näkyviin kerralla eikä valintaa tarvitse kaivaa esiin.
+ * Rivit rivittyvät kapealla näytöllä sen sijaan että leikkautuisivat.
+ */
+.picker { display: flex; flex-direction: column; gap: var(--space-4); }
+.picker-row { display: flex; flex-direction: column; gap: var(--space-2); }
+.picker-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.chip {
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border-radius: var(--r-full);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.chip:hover:not(:disabled):not([aria-pressed='true']) {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.chip[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+.chip:disabled { opacity: 0.3; }
+.picker-count { margin: 0; font-size: 12px; color: var(--muted); }
+.picker-count strong { color: var(--text); font-variant-numeric: tabular-nums; }
+
+.category-row { display: flex; flex-direction: column; gap: var(--space-2); }
+.category-hint { font-size: 11.5px; line-height: 1.5; color: var(--muted); }
+
+/* vaikeustasorivi: viisi askelta, nykyinen korostettuna */
+.rail { display: flex; gap: var(--space-2); }
+.rail-step {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) var(--space-1);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  opacity: 0.45;
+  transition: opacity 0.2s, border-color 0.2s;
+}
+.rail-step.active { opacity: 1; border-color: var(--accent); }
+.rail-step.done { opacity: 1; }
+.rail-dot { width: 100%; height: 3px; border-radius: 2px; background: currentColor; }
+.rail-label { font-size: 9.5px; font-weight: 500; color: var(--muted); text-align: center; line-height: 1.2; }
+.rail-mark { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; min-height: 14px; }
+
+/* soitinkortti: pelin ainoa varsinainen pinta */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.tier-chip {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--r-full);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface-2);
+}
+.tier-chip .bullet { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/*
+ * Aikajana. Akseli on NYKYISEN klipin pituus, joten soittopää kulkee aina
+ * tasaisesti reunasta reunaan riippumatta siitä onko klippi 0,1 vai 15 s.
+ * Perustelu ks. src/game/timeline.ts.
+ */
+.stagebar { display: flex; flex-direction: column; gap: var(--space-2); }
+.stagebar-track {
+  position: relative;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+/* Avattu alue kasvaa vihje vihjeeltä samalla janalla. */
+.stagebar-unlocked {
+  position: absolute; inset: 0 auto 0 0;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Merkki jokaisessa vihjepituudessa. */
+.stagebar-tick {
+  position: absolute; top: 0; bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--bg);
+  opacity: 0.75;
+}
+.stagebar-tick.on { opacity: 0.45; }
+/* Soittopää. Ei siirtymää: se päivittyy joka framella äänen omasta kellosta,
+   ja CSS-transition jarruttaisi sen jälkeen. */
+.stagebar-head {
+  position: absolute; top: -3px; bottom: -3px;
+  width: 2px;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+}
+.stagebar-labels { position: relative; height: 14px; }
+.stagebar-labels span {
+  position: absolute; top: 0;
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+.stagebar-labels span.on { color: var(--text); font-weight: 600; }
+
+/* soittonappi */
+.play-row { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); }
+.play-btn {
+  width: 76px; height: 76px; flex: none;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--accent);
+  color: #fff;
+  transition: filter 0.2s, transform 0.12s;
+}
+.play-btn:hover:not(:disabled) { filter: brightness(1.12); }
+.play-btn:active:not(:disabled) { transform: scale(0.95); }
+.play-btn:disabled { filter: grayscale(0.6) brightness(0.6); }
+.play-btn.playing { animation: pulse 1.4s ease-out infinite; }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(124, 92, 255, 0.4); }
+  100% { box-shadow: 0 0 0 18px rgba(124, 92, 255, 0); }
+}
+.play-meta { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); text-align: center; }
+.play-meta strong { font-size: 15px; font-weight: 600; }
+.play-meta span { font-size: 12px; color: var(--muted); }
+
+/* arvausruudut */
+.guesses { display: flex; flex-direction: column; gap: var(--space-2); }
+.guess {
+  min-height: 40px;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 0 var(--space-3);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+.guess.empty { color: var(--muted); opacity: 0.35; }
+.guess.vaara { border-color: rgba(244, 65, 94, 0.35); }
+.guess.ohitus { color: var(--muted); }
+.guess.oikein { border-color: rgba(74, 222, 128, 0.5); background: rgba(74, 222, 128, 0.08); }
+.guess-icon { flex: none; width: 16px; text-align: center; font-size: 12px; }
+.guess-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guess-hint {
+  margin-left: auto; flex: none;
+  font-size: 10px; font-weight: 600; color: var(--warn);
+  background: rgba(251, 191, 36, 0.12);
+  padding: 3px var(--space-2);
+  border-radius: var(--r-full);
+}
+
+/* hakukenttä */
+.search { position: relative; }
+.search input {
+  width: 100%; min-height: 48px;
+  padding: 0 44px 0 var(--space-4);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.search input:focus { border-color: var(--accent); }
+.search input::placeholder { color: var(--muted); }
+.search-clear {
+  position: absolute; right: var(--space-2); top: var(--space-2);
+  width: 32px; height: 32px;
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  display: grid; place-items: center;
+}
+.search-clear:hover { color: var(--text); background: var(--surface-3); }
+.suggestions {
+  position: absolute; bottom: calc(100% + var(--space-2)); left: 0; right: 0; z-index: 20;
+  max-height: 268px; overflow-y: auto;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 24px 48px -20px #000;
+  padding: var(--space-1);
+}
+.suggestion {
+  width: 100%; text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.suggestion:hover, .suggestion.cursor { background: var(--surface-3); }
+.suggestion .s-title { font-weight: 500; }
+.suggestion .s-artist { font-size: 11.5px; color: var(--muted); }
+
+/* ohita / arvaa */
+.actions { display: flex; gap: var(--space-3); }
+.btn {
+  flex: 1; min-height: 48px;
+  border-radius: var(--r-md);
+  font-weight: 600; font-size: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  transition: background 0.2s, border-color 0.2s, transform 0.1s, opacity 0.2s;
+}
+.btn:hover:not(:disabled) { background: var(--surface-3); border-color: var(--border-strong); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: 0.4; }
+.btn.primary { background: var(--accent); border-color: transparent; color: #fff; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.1); background: var(--accent); }
+.btn.skip { flex: 0 0 34%; }
+
+/* paljastus */
+.reveal {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  align-items: center; text-align: center;
+  animation: rise 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+.reveal img { width: 168px; height: 168px; border-radius: var(--r-md); background: var(--surface-3); }
+.reveal .verdict { font-size: 11px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; }
+.reveal .verdict.ok { color: var(--ok); }
+.reveal .verdict.bad { color: var(--bad); }
+.reveal h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.reveal .artist, .reveal .album { margin: 0; color: var(--muted); }
+.reveal .artist { font-size: 14px; }
+.reveal .album { font-size: 12px; opacity: 0.8; }
+.points { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+
+/* yhteenveto */
+.summary-total { text-align: center; display: flex; flex-direction: column; gap: var(--space-1); }
+.summary-total .big {
+  font-size: 44px; font-weight: 700;
+  font-variant-numeric: tabular-nums; line-height: 1;
+  color: var(--accent);
+}
+.summary-total .of { color: var(--muted); font-size: 13px; }
+.summary-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.summary-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.summary-row img { width: 40px; height: 40px; border-radius: var(--r-sm); flex: none; background: var(--surface-3); }
+.summary-row .meta { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.summary-row .meta b { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.summary-row .meta span { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.summary-row .pts { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 14px; flex: none; }
+.summary-row .pts.zero { color: var(--muted); }
+.share-box {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px; line-height: 1.7; white-space: pre-wrap;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--space-3) var(--space-4);
+  color: var(--muted);
+}
+
+/* modaali */
+.overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(4, 5, 9, 0.72);
+  display: grid; place-items: center;
+  padding: var(--space-4);
+  animation: fade 0.15s;
+}
+@keyframes fade { from { opacity: 0; } }
+.modal {
+  width: 100%; max-width: 440px; max-height: 85vh; overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  padding: var(--space-5);
+  animation: rise 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-4); }
+.modal-head h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+.modal p, .modal ol, .modal ul { color: var(--muted); font-size: 14px; line-height: 1.65; }
+.modal ol, .modal ul { padding-left: var(--space-5); }
+.modal strong { color: var(--text); }
+
+.howto-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: var(--space-2); }
+.howto-table th, .howto-table td { padding: var(--space-2); text-align: left; border-bottom: 1px solid var(--border); }
+.howto-table th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+.howto-table td { font-variant-numeric: tabular-nums; }
+
+.stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
+.stat {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--space-3);
+  text-align: center;
+}
+.stat b { display: block; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.stat span { font-size: 11px; color: var(--muted); }
+
+/* tilan viestit */
+.notice { text-align: center; color: var(--muted); font-size: 14px; padding: var(--space-7) var(--space-5); line-height: 1.7; }
+.toast {
+  position: fixed; bottom: var(--space-5); left: 50%; transform: translateX(-50%);
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--r-full);
+  font-size: 13px; font-weight: 500;
+  z-index: 200;
+  animation: rise 0.18s;
+}
+
+@media (max-width: 420px) {
+  .app { padding: var(--space-5) var(--space-3) var(--space-6); gap: var(--space-4); }
+  .card { padding: var(--space-4); gap: var(--space-4); }
+  .rail-label { font-size: 8.5px; }
+  .reveal img { width: 140px; height: 140px; }
+}
+
+/*
+ * Kapealla näytöllä .side ja .main eivät ole omia laatikoitaan: `display:
+ * contents` pudottaa ne pois asettelusta, jolloin niiden lapset ovat suoraan
+ * .app-pystypinon osia eikä ylimääräisiä välejä synny. Leveällä näytöllä ne
+ * heräävät henkiin ruudukon sarakkeiksi.
+ */
+.side, .main { display: contents; }
+
+/*
+ * Työpöytä: kaksi palstaa.
+ *
+ * Kapea mobiilipylväs keskellä isoa ruutua näyttää hukkaan heitetyltä ja
+ * pakottaa vierittämään. Asetukset (tila + kategoriat) siirtyvät vasempaan
+ * sarakkeeseen ja itse soitin oikeaan, jolloin koko peli mahtuu näkyviin
+ * kerralla eikä mitään tarvitse etsiä vierittämällä.
+ */
+@media (min-width: 900px) {
+  .app {
+    max-width: 1060px;
+    min-height: 100dvh;
+    padding: var(--space-6) var(--space-6) var(--space-5);
+    display: grid;
+    grid-template-columns: 296px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      'top  top'
+      'side main';
+    column-gap: var(--space-6);
+    row-gap: var(--space-5);
+    align-content: start;
+  }
+
+  .top { grid-area: top; padding-bottom: var(--space-2); border-bottom: 1px solid var(--border); }
+  .brand { flex-direction: row; align-items: baseline; gap: var(--space-3); }
+  .brand h1 { font-size: 28px; }
+
+  .side {
+    grid-area: side;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    align-self: start;
+    position: sticky;
+    top: var(--space-6);
+  }
+
+  .main {
+    grid-area: main;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+  }
+
+  /* Kortti täyttää palstan ja jakaa tilan tasaisesti, jotta se ei jää
+     lyhyeksi läntiksi leveän sarakkeen yläreunaan. */
+  .card { padding: var(--space-6); gap: var(--space-5); }
+
+  /* Genrevalinnat mahtuvat sivupalstassa kahteen riviin – ei rivitystä
+     yksi siru per rivi. */
+  .picker { gap: var(--space-5); }
+
+  /* Ohita/Arvaa eivät tarvitse koko leveyttä isolla ruudulla. */
+  .actions { justify-content: center; }
+  .btn { max-width: 240px; }
+  .btn.skip { flex: 0 0 150px; }
+
+  .reveal img { width: 180px; height: 180px; }
+  .suggestions { max-height: 300px; }
+}
+
+/* Erittäin leveä ruutu: hieman lisää ilmaa, ei enempää leveyttä. */
+@media (min-width: 1280px) {
+  .app { max-width: 1140px; column-gap: var(--space-7); }
+}

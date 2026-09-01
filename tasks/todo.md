@@ -1,0 +1,93 @@
+# Korvamato — uudistus
+
+## Tavoite
+Biisipiste -> **Korvamato**. Songspot-tyylinen yksinkertaisempi UI, aikakausi- ja
+genrekategoriat, automaattisesti kasvava biisikanta, korjattu aikajana.
+
+## Tehtävät
+
+### 1. Nimi ja perusta
+- [x] Selvitä koodin nykytila
+- [x] Varmista että Applen rajapinnat toimivat (RSS-listat, haku, artistikatalogi)
+- [x] Nimi Korvamato: package.json, index.html, README, UI
+
+### 2. Datasopimus (jaettu molemmille agenteille)
+- [x] `Song` saa kentät `genre` ja `era`
+- [x] Olemassa oleva 204 biisin kanta rikastetaan genre+era (iTunes lookup)
+
+### 3. Biisikanta (data-agentti — käynnissä)
+- [ ] Automaattinen haku: FI-suosituimmat + genrelistaukset + artistikatalogien laajennus
+- [ ] Ei kovakoodattuja biisilistoja — siemeninä vain artistit, kappaleet haetaan
+- [ ] Genreluokitus: rokki / rappi / pop / iskelmä (iTunes primaryGenreName)
+- [ ] Aikakausiluokitus: 2020-luku / 2010-luku / 1970–2010
+- [ ] Vaikeustaso johdetaan datasta (suosio), ei käsin
+
+### 4. UI (valmis)
+- [x] Songspot-tyylinen pelinäkymä: yksi kortti, aikajana, iso soittonappi
+- [x] Kategorianvalinta: aikakausi + genre
+- [x] **Aikajanan korjaus** — lohkot ovat nyt tasalevyisiä vaikka sekunnit eivät ole;
+      soittopää ja sekuntimerkit eivät täsmää
+
+### 4b. Omat korjaukseni agentin työhön
+- [x] Akseli lineaarinen -> logaritminen: lineaarisella 0,1/0,5/2 s kasautuivat
+      päällekkäin (0,7 % / 3,3 % / 13,3 %) ja avattu alue oli 2,5 px siivu
+- [x] Poistettu jakotekstistä keksitty osoite korvamato.fi
+
+### 5. Verifiointi
+- [ ] `npm run build` läpi
+- [ ] `npm test` läpi
+- [ ] Aikajanan täsmäys todistettu
+
+---
+
+## Review
+
+**Nimi:** Biisipiste → **Korvamato**. Kuvaa täsmälleen pelin ideaa (pätkä jää soimaan
+päähän), lyhyt ja suomalainen. Vaihdettu index.html, App.tsx, share.ts, storage.ts:n
+avaimet, daily.ts:n hash-suola, package.json ja README.
+
+**Aikajana — kolme juurisyytä, kaikki korjattu.** Uusi `src/game/timeline.ts` antaa yhden
+sekunti→prosentti-kuvauksen jota sekä merkit että soittopää käyttävät, joten ne eivät voi
+olla eri mieltä. Soittopään paikka tulee kuluneista sekunneista, ei klipin sisäisestä
+osuudesta kerrottuna vääristyneellä akselilla. Kello luetaan `AudioContext.currentTime`:sta
+eikä `performance.now()`:sta, joten kuva ei lähde ennen ääntä.
+
+Akseli on **logaritminen**. Agentti toteutti sen lineaarisena, mikä on teknisesti oikein
+mutta käytännössä rikki: 0,1/0,5/2 s osuisivat kohtiin 0,7 % / 3,3 % / 13,3 % eli
+päällekkäin, ja ensimmäisen vihjeen avattu alue olisi 2,5 px. Logaritmisella akselilla
+merkit ovat 3,4 % / 14,6 % / 39,6 % / 79,2 % / 100 %.
+
+**Biisikanta:** 204 → **3 174** biisiä, haettu automaattisesti (`scripts/build-library.mjs`).
+Käsin ylläpidetään enää artistien *nimiä*, ei kappaleita. Kaikki 20 kategoriayhdistelmää
+tuottavat täyden viiden biisin kierroksen.
+
+## Omat korjaukset agenttien työhön
+- Aikajanan akseli lineaarinen → logaritminen (yllä)
+- Poistettu jakotekstistä keksitty osoite `korvamato.fi`, jota käyttäjä ei omista
+- Kieltolista vertaili koko artistimerkkijonoa täsmähaulla → `LE SSERAFIM, ILLIT &
+  KATSEYE` ja `HUGEL, Imael Angel & Ultra Naté` pääsivät suomalaiseen visaan 16 biisillä.
+  Nimi pilkotaan nyt osiin ennen vertailua.
+- Hittikimarat (”Dirlanda / Kylähäät / Tumma nainen / …” yhtenä raitana, 13 kpl) eivät ole
+  arvattavissa → suodatetaan pois
+- Kokoelmalevyt kantoivat kokoelman julkaisupäivää, joten Kari Tapion 1970-luvun
+  levytykset päätyivät 2010-luvulle → vuosi luetaan levyn nimen vuosiluvusta tai
+  jätetään tuntemattomaksi (→ klassikot)
+- Data-agentti ei koskaan kirjoittanut `songs.json`-tiedostoa (pysähtyi odottamaan omaa
+  taustaprosessiaan) → ajoin putken itse loppuun
+
+## Tiedossa olevat rajoitukset
+- **Aikakausi ei ole aina oikein.** Apple kertoo julkaisun, ei alkuperäisen levytyksen
+  päivämäärän. Kokoelmat tunnistetaan, mutta yksittäisiä uudelleenjulkaisuja luiskahtaa
+  väärälle vuosikymmenelle. Ei korjattavissa täydellisesti tällä datalähteellä.
+- **Iskelmä ei tule Applen datasta** (526 alagenreä, ei iskelmä-solmua) vaan
+  artistisiemenestä. Uusi iskelmäartisti lisätään nimeltä `ISKELMA_SEED`-listaan.
+- `dist` on 1,8 Mt / 400 kt pakattuna, koska biisikanta on nidottu JS-pakettiin.
+
+## Verifiointi
+- [x] `npx tsc -b` puhtaasti
+- [x] `npm run build` läpi
+- [x] `npm test` — 108 logiikkatarkistusta + 14 renderöintitarkistusta, 0 hylättyä
+- [x] Aikajana: soittopää osuu merkkiin täsmälleen klipin lopussa jokaisella vihjetasolla
+- [x] Skeema: 3 174 uniikkia id:tä, 0 virhettä, 0 duplikaattia, 0 hittikimaraa
+- [x] Ääninäytteet: 20/20 satunnaisotoksesta vastasi 200/206
+- [x] Kaikki 20 kategoriayhdistelmää tuottavat täyden kierroksen
