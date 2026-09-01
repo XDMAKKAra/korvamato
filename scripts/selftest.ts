@@ -402,15 +402,35 @@ section('Haku osuu feat-vieraisiin')
 const featSongs = SONGS.filter((s) => s.artists && s.artists.length > 1)
 check('kannassa on feat-kappaleita', featSongs.length > 0, `${featSongs.length} kpl`)
 
-// Käyttäjän raportoima tapaus: "Uskomaton" on Elastisen biisi jossa on Sara Bee,
-// ja sen pitää löytyä myös vieraan nimellä.
+// Käyttäjän raportoima tapaus: "Uskomaton" on Elastisen biisi jossa on Sara
+// Bee, ja sen pitää löytyä myös vieraan nimellä.
+//
+// Pelkkä vieraan nimi ei riitä kriteeriksi: suosituilla vierailla (Käärijä,
+// Sexmane, Cledos) on itsellään yli 20 omaa biisiä, jotka täyttävät
+// tuloslistan ennen yhteistyökappaletta – ja niin kuuluukin. Testataan siis
+// niin kuin pelaaja oikeasti hakee: vieraan nimi ja sana kappaleen nimestä.
 const guestHits = featSongs.filter((s) => {
+  const guest = s.artists[s.artists.length - 1]
+  const word = s.title.split(/\s+/)[0]
+  return searchSongs(`${guest} ${word}`, SONGS, 20).some((r) => r.id === s.id)
+})
+check('feat-vieraan nimellä ja biisin sanalla löytyy oikea kappale',
+  featSongs.length > 0 && guestHits.length / featSongs.length > 0.9,
+  `${guestHits.length}/${featSongs.length}`)
+
+// Pelkällä vieraan nimellä pitää löytyä ainakin silloin kun vieraalla ei ole
+// omaa laajaa tuotantoa täyttämässä tuloslistaa.
+const rareGuests = featSongs.filter((s) => {
+  const guest = normalize(s.artists[s.artists.length - 1])
+  return SONGS.filter((x) => x.artists?.some((a) => normalize(a) === guest)).length <= 15
+})
+const rareHits = rareGuests.filter((s) => {
   const guest = s.artists[s.artists.length - 1]
   return searchSongs(guest, SONGS, 20).some((r) => r.id === s.id)
 })
-check('feat-vieraan nimellä löytyy kappale jolla hän esiintyy',
-  featSongs.length > 0 && guestHits.length / featSongs.length > 0.9,
-  `${guestHits.length}/${featSongs.length} löytyi vieraan nimellä`)
+check('harvinaisen feat-vieraan pelkkä nimi riittää',
+  rareGuests.length > 0 && rareHits.length / rareGuests.length > 0.9,
+  `${rareHits.length}/${rareGuests.length}`)
 
 check('näytettävä nimi paljastaa feat-vieraan',
   featSongs.every((s) => !/feat/i.test(s.fullTitle) || /feat/i.test(songLabel(s))),

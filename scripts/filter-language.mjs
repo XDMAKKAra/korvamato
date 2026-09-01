@@ -13,6 +13,14 @@
  *
  *   node scripts/filter-language.mjs --dry    näyttää mitä poistuisi
  *   node scripts/filter-language.mjs          kirjoittaa suodatetun kannan
+ *   node scripts/filter-language.mjs --file=data/.pipeline-matched.json
+ *
+ * **Ajojärjestys on olennainen.** Tämä pitää ajaa ENNEN lokerovalintaa, ei sen
+ * jälkeen: rock/klassikot-lokeron kuunnelluin kärki on täynnä englanniksi
+ * laulavaa metallia (HIM 6,3 milj., The Rasmus 5,0 milj.), jolla on
+ * kymmenkertaiset toistomäärät suomenkieliseen rockiin verrattuna. Jos lokero
+ * täytetään ensin ja suodatetaan vasta sitten, Eppu Normaali (427 t.) ja Juice
+ * Leskinen (237 t.) eivät mahdu kärkeen lainkaan ja lokeroon jää murto-osa.
  */
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
@@ -20,10 +28,12 @@ import { dirname, join } from 'node:path'
 import { mbLanguages, decideFinnishLyrics } from './language.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const SONGS = join(ROOT, 'src', 'data', 'songs.json')
+const args = process.argv.slice(2)
+const fileArg = args.find((a) => a.startsWith('--file='))
+const SONGS = fileArg ? join(ROOT, fileArg.slice('--file='.length)) : join(ROOT, 'src', 'data', 'songs.json')
 const CACHE = join(ROOT, 'data', '.language-cache.json')
 
-const DRY = process.argv.includes('--dry')
+const DRY = args.includes('--dry')
 
 async function loadJson(p, fallback) {
   try { return JSON.parse(await readFile(p, 'utf8')) } catch { return fallback }
