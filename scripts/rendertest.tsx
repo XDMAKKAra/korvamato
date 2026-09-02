@@ -38,7 +38,12 @@ try {
 }
 
 check('sivulla on pelin nimi', html.includes('Korvamato'))
-check('hakukenttä näkyy', html.includes('Tunnistatko biisin'))
+// Hakuluettelo ladataan omana palanaan (dynaaminen import), joten palvelin-
+// renderöinnissä kenttä on vielä latausasennossa. Tarkistetaan siis kenttä
+// itse, ei sen paikkatekstiä.
+check('hakukenttä näkyy', html.includes('Hae biisiä'))
+check('hakukenttä kertoo latauksesta ennen luettelon saapumista',
+  html.includes('Ladataan biisiluetteloa'))
 check('ohita-nappi näkyy', html.includes('Ohita'))
 check('soita-nappi näkyy', html.includes('Soita vihje'))
 check('ensimmäinen vihje on 0,2 s', html.includes('0,2 s'))

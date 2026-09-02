@@ -1,11 +1,13 @@
+import { useRef } from 'react'
 import { formatSeconds } from '../game/rules'
-import { AXIS_SECONDS, headPercent, ticks, unlockedPercent } from '../game/timeline'
+import { AXIS_SECONDS, clipSeconds, headPercent, ticks, unlockedPercent } from '../game/timeline'
+import { useClipProgress } from '../game/useClipProgress'
 
 interface Props {
   /** Monesko vihje on auki (0 = lyhin). */
   stageIndex: number
-  /** Kuluneet sekunnit nykyisestä klipistä, tai null kun ei soiteta. */
-  elapsed: number | null
+  /** Soiko klippi juuri nyt? Käynnistää soittopään animaation. */
+  playing: boolean
 }
 
 /**
@@ -13,21 +15,41 @@ interface Props {
  *
  * Palkki pysyy samassa mittakaavassa koko pelin ajan: avattu alue kasvaa
  * vihje vihjeeltä samalla janalla sen sijaan että jokainen vihje piirtäisi
- * oman palkkinsa. Akselin lohkojako on `timeline.ts`:ssä.
+ * oman palkkinsa. Akseli on lineaarinen sekunneissa (ks. timeline.ts), joten
+ * soittopää kulkee tasaisella nopeudella eivätkä sekuntiluvut valehtele.
  *
  * Kolme kerrosta, kolme eri kysymystä:
  *   - `unlocked` — kuinka pitkälle biisi on avattu (kasvaa vihje vihjeeltä)
  *   - `played`   — kuinka pitkälle tämä toisto on ehtinyt (liikkuu joka framella)
  *   - `head`     — soittopää eli `played`-alueen kärki
  *
+ * Kaksi jälkimmäistä päivitetään suoraan DOM:iin refin kautta eikä React-tilan
+ * läpi: ks. useClipProgress. Siksi tässä komponentissa ei ole tilaa lainkaan.
+ *
  * Soittopää on radan ulkopuolella sisaruksena, koska rata leikkaa sisältönsä
  * (`overflow: hidden`) pyöristettyjen päiden vuoksi. Radan sisällä soittopää
  * katoaisi näkyvistä juuri janan lopussa, missä sitä eniten katsotaan.
  */
-export function StageBar({ stageIndex, elapsed }: Props) {
+export function StageBar({ stageIndex, playing }: Props) {
   const unlocked = unlockedPercent(stageIndex)
   const marks = ticks(stageIndex)
-  const head = elapsed === null ? null : headPercent(elapsed)
+
+  const playedRef = useRef<HTMLDivElement>(null)
+  const headRef = useRef<HTMLDivElement>(null)
+
+  useClipProgress(playing, ({ seconds, active }) => {
+    const percent = active ? headPercent(seconds) : 0
+    const played = playedRef.current
+    const head = headRef.current
+    if (played) {
+      played.style.width = `${percent}%`
+      played.style.opacity = active ? '1' : '0'
+    }
+    if (head) {
+      head.style.left = `${percent}%`
+      head.style.opacity = active ? '1' : '0'
+    }
+  })
 
   return (
     <div className="stagebar">
@@ -35,13 +57,14 @@ export function StageBar({ stageIndex, elapsed }: Props) {
         <div
           className="stagebar-track"
           role="progressbar"
-          aria-label="Vihjeen pituus aikajanalla"
+          aria-label="Avattu osuus biisistä"
           aria-valuemin={0}
           aria-valuemax={AXIS_SECONDS}
-          aria-valuenow={elapsed ?? 0}
+          aria-valuenow={clipSeconds(stageIndex)}
+          aria-valuetext={formatSeconds(clipSeconds(stageIndex))}
         >
           <div className="stagebar-unlocked" style={{ width: `${unlocked}%` }} />
-          {head !== null && <div className="stagebar-played" style={{ width: `${head}%` }} />}
+          <div className="stagebar-played" ref={playedRef} />
           {marks.map((t) => (
             <span
               key={t.seconds}
@@ -50,7 +73,7 @@ export function StageBar({ stageIndex, elapsed }: Props) {
             />
           ))}
         </div>
-        {head !== null && <div className="stagebar-head" style={{ left: `${head}%` }} />}
+        <div className="stagebar-head" ref={headRef} />
       </div>
 
       <div className="stagebar-labels">
@@ -62,10 +85,14 @@ export function StageBar({ stageIndex, elapsed }: Props) {
               className={t.percent <= unlocked ? 'on' : ''}
               style={{
                 left: `${t.percent}%`,
-                // Luku keskitetään merkkinsä kohdalle. Viimeinen on janan
-                // päässä, joten se vedetään kokonaan vasemmalle ettei se
-                // valuisi kortin reunan yli.
-                transform: i === all.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
+                // Luku keskitetään merkkinsä kohdalle. Reunimmaiset vedetään
+                // kokonaan janan sisään, ettei numero valu kortin reunan yli.
+                transform:
+                  i === all.length - 1
+                    ? 'translateX(-100%)'
+                    : i === 0 && t.percent < 6
+                      ? 'translateX(0)'
+                      : 'translateX(-50%)',
               }}
             >
               {formatSeconds(t.seconds)}

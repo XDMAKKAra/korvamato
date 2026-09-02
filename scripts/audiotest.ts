@@ -22,9 +22,14 @@ interface FakeSource {
 const sources: FakeSource[] = []
 
 class FakeCtx {
+  /** Viimeksi luotu konteksti, jotta testi voi kelata kelloa eteenpain. */
+  static last: FakeCtx | null = null
   currentTime = 0
   state = 'running'
   destination = {}
+  constructor() {
+    FakeCtx.last = this
+  }
   resume() {
     this.state = 'running'
     return Promise.resolve()
@@ -79,6 +84,8 @@ class FakeCtx {
 
 const { player } = await import('../src/game/audio')
 import type { Song } from '../src/types'
+import { headPercent, unlockedPercent } from '../src/game/timeline'
+import { STAGES } from '../src/game/rules'
 
 const SONG: Song = {
   id: 'testi-1',
@@ -126,6 +133,57 @@ player.stop()
 await tick()
 check('pysäytys nollaa keston', player.currentDuration() === 0, `${player.currentDuration()}`)
 check('pysäytys nollaa kellon', player.elapsed() === null)
+
+/* 5. Animaation eteneminen: sama laskenta jota useClipProgress ajaa joka
+   framella. Testataan että soittopää oikeasti liikkuu — ei jää nollaan eikä
+   hyppää — ja päätyy klipin lopussa täsmälleen vihjeen merkkiin. */
+
+/** Yhden toiston framet: [osuus renkaalle, prosentti janalla]. */
+function frames(clipSeconds: number): { fraction: number; percent: number }[] {
+  const ctx = FakeCtx.last!
+  const t0 = ctx.currentTime + 0.02
+  const out: { fraction: number; percent: number }[] = []
+  for (let t = t0; t <= t0 + clipSeconds; t += 1 / 60) {
+    ctx.currentTime = t
+    const elapsed = player.elapsed()
+    const duration = player.currentDuration()
+    if (elapsed === null || duration <= 0) continue
+    const seconds = Math.min(elapsed, duration)
+    out.push({ fraction: seconds / duration, percent: headPercent(seconds) })
+  }
+  // Viimeinen frame tasan klipin lopussa.
+  ctx.currentTime = t0 + clipSeconds
+  const seconds = Math.min(player.elapsed()!, player.currentDuration())
+  out.push({ fraction: seconds / player.currentDuration(), percent: headPercent(seconds) })
+  return out
+}
+
+for (const stage of [0, 2, 5]) {
+  const seconds = STAGES[stage]
+  player.stop()
+  FakeCtx.last!.currentTime = 0
+  void player.play(SONG, seconds)
+  await tick()
+  const f = frames(seconds)
+
+  check(`vihje ${seconds} s: frameja syntyy`, f.length >= 3, `${f.length} framea`)
+  check(`vihje ${seconds} s: rengas lahtee nollasta`, f[0].fraction < 0.15,
+    `${f[0].fraction.toFixed(3)}`)
+  check(`vihje ${seconds} s: rengas kiertaa tayteen`,
+    Math.abs(f[f.length - 1].fraction - 1) < 1e-6, `${f[f.length - 1].fraction.toFixed(4)}`)
+  check(`vihje ${seconds} s: eteneminen on monotonista`,
+    f.every((v, i) => i === 0 || v.fraction >= f[i - 1].fraction - 1e-9))
+  check(`vihje ${seconds} s: soittopaa paatyy vihjeen merkkiin`,
+    Math.abs(f[f.length - 1].percent - unlockedPercent(stage)) < 1e-6,
+    `${f[f.length - 1].percent.toFixed(2)}% vs ${unlockedPercent(stage).toFixed(2)}%`)
+  // Tasainen nopeus: perakkaisten framejen askel janalla on aina sama.
+  const steps = f.slice(1, -1).map((v, i) => v.percent - f[i].percent).filter((d) => d > 1e-9)
+  check(`vihje ${seconds} s: soittopaa liikkuu tasaisesti`,
+    steps.length > 0 && Math.max(...steps) - Math.min(...steps) < 1e-6,
+    steps.length ? `askel ${Math.min(...steps).toFixed(4)}...${Math.max(...steps).toFixed(4)} %` : 'ei askelia')
+}
+
+player.stop()
 
 console.log(failed === 0 ? '\nSoitin kunnossa.' : `\n${failed} tarkistusta hylätty.`)
 if (failed > 0) process.exitCode = 1

@@ -1,5 +1,18 @@
 import type { Song } from '../types'
 
+/**
+ * Kaikki mitä haku ja arvausten vertailu tarvitsevat. Sekä `Song` (pelattava
+ * kanta) että `CatalogEntry` (hakuluettelo) täyttävät tämän, joten sama
+ * hakukoodi palvelee molempia.
+ */
+export interface Searchable {
+  artist: string
+  title: string
+  fullTitle?: string
+  artists?: string[]
+  plays?: number
+}
+
 /** Pienet kirjaimet, ei ääkkösiä eikä välimerkkejä – vertailua varten. */
 export function normalize(s: string): string {
   return (s || '')
@@ -16,15 +29,23 @@ export function normalize(s: string): string {
  * "Elastinen – Uskomaton" salaa että kappaleella on myös Sara Bee, ja
  * juuri sillä nimellä pelaaja saattoi biisin etsiäkin.
  */
-export function songLabel(song: Song): string {
+export function songLabel(song: Searchable): string {
   return `${song.artist} – ${song.fullTitle || song.title}`
+}
+
+/** Pudottaa sulkeissa olevat lisäkkeet: "Biisi (feat. X)" -> "Biisi". */
+export function stripParens(s: string): string {
+  return (s || '')
+    .replace(/\s*[([].*?[)\]]\s*/g, ' ')
+    .replace(/\s*-\s*(feat|ft)\..*$/i, ' ')
+    .trim()
 }
 
 /**
  * Kaikki tekstit joista hakusanaa etsitään: artistit (myös feat-vieraat),
  * biisin nimi ja koko nimi sulkeineen.
  */
-function haystack(song: Song): string {
+function haystack(song: Searchable): string {
   const artists = song.artists?.length ? song.artists : [song.artist]
   return normalize([...artists, song.title, song.fullTitle].join(' '))
 }
@@ -35,8 +56,34 @@ export function isSameSong(a: Song, b: Song): boolean {
   return normalize(a.artist) === normalize(b.artist) && normalize(a.title) === normalize(b.title)
 }
 
-interface Scored {
-  song: Song
+/**
+ * Biisin tunniste nimen perusteella: artisti + nimi ilman sulkeita, ääkkösiä,
+ * välimerkkejä ja **välilyöntejä**.
+ *
+ * Välilyönnit jätetään huomiotta, koska sama kappale on levytetty eri
+ * kirjoitusasuilla: Kapasiteettiyksikön "Hei Neidit" ja "Heineidit" ovat sama
+ * biisi, samoin Eppu Normaalin "Joka Ikinen Yö" ja "Jokaikinen Yö". Ilman tätä
+ * kannassa olisi sama biisi kahdesti, ja pelaaja saisi väärin vaikka kirjoitti
+ * oikein – vain eri välilyönnein.
+ */
+export function songKey(artist: string, title: string): string {
+  return `${normalize(artist)}|${normalize(stripParens(title)).replace(/ /g, '')}`
+}
+
+/**
+ * Osuiko hakuluettelosta valittu rivi oikeaan biisiin?
+ *
+ * Vertailu on tehtävä nimien perusteella, koska luettelorivillä ei ole id:tä –
+ * eikä saa ollakaan (ks. CatalogEntry). Sulkeissa olevat lisäkkeet pudotetaan
+ * molemmilta puolilta, jotta "Uskomaton" ja "Uskomaton (feat. Sara Bee)"
+ * tarkoittavat samaa biisiä.
+ */
+export function guessMatches(guess: Searchable, answer: Song): boolean {
+  return songKey(guess.artist, guess.title) === songKey(answer.artist, answer.title)
+}
+
+interface Scored<T> {
+  song: T
   score: number
 }
 
@@ -44,12 +91,12 @@ interface Scored {
  * Hakee biisejä vapaalla tekstillä. Osuu sekä artistiin että biisin nimeen,
  * ja sietää kirjoitusasun heitot ("kaarija" löytää Käärijän).
  */
-export function searchSongs(query: string, songs: Song[], limit = 8): Song[] {
+export function searchSongs<T extends Searchable>(query: string, songs: T[], limit = 8): T[] {
   const q = normalize(query)
   if (q.length < 1) return []
 
   const tokens = q.split(' ').filter(Boolean)
-  const out: Scored[] = []
+  const out: Scored<T>[] = []
 
   for (const song of songs) {
     const artist = normalize(song.artist)
@@ -84,25 +131,33 @@ export function searchSongs(query: string, songs: Song[], limit = 8): Song[] {
   }
 
   /*
-   * Yhtä hyvien osumien järjestys ratkaistaan TOISTOMÄÄRÄLLÄ, ei nimen
-   * pituudella eikä aakkosilla.
+   * Yhtä hyvien osumien järjestys ratkaistaan AAKKOSILLA – ei toistomäärällä
+   * eikä nimen pituudella.
    *
-   * Aiemmin lyhyt nimi sai paremmat pisteet (`700 - title.length`), jolloin
-   * hakusanalla "par" nouseva ehdotus saattoi olla tuntematon lyhytnimineen
-   * biisi tunnettujen ohi. Se näytti siltä kuin haku vihjaisisi vastausta.
-   * Haku ei tiedä eikä ole koskaan tiennyt oikeaa vastausta – mutta nyt
-   * järjestys on myös perusteltu: tunnetuin ensin, kuten pelaaja odottaa.
+   * Tämä on hakuluettelon kanssa sama asia kuin luettelon laajuus: pelkkä
+   * laaja luettelo ei riitä, jos järjestys nostaa kärkeen juuri ne rivit jotka
+   * voivat olla vastaus. Toistomääräjärjestyksessä artistihaun kahdeksan
+   * ensimmäistä osumaa olivat käytännössä aina artistin kuunnelluimmat biisit
+   * – siis täsmälleen se joukko josta vastaus arvotaan, koska pelattavaan
+   * kantaan valitaan kuunnelluin kärki. Ehdotuslista vuosi vastauksen vaikka
+   * luettelossa oli 31 000 riviä.
+   *
+   * Aakkosjärjestys ei tiedä biisin suosiosta mitään, ja se on pelaajalle myös
+   * käytettävämpi: pitkää ehdotuslistaa silmäillessä nimen löytää siitä missä
+   * sen odottaakin. Osumatarkkuus ratkaisee yhä ensin (tarkka nimi ja alkuosa
+   * saavat isommat pisteet), joten kirjoittamalla lisää oikea rivi nousee
+   * kärkeen riippumatta siitä mistä kohtaa aakkosia se alkaa.
    */
   out.sort(
     (a, b) =>
       b.score - a.score ||
-      (b.song.plays ?? 0) - (a.song.plays ?? 0) ||
+      a.song.title.localeCompare(b.song.title, 'fi') ||
       a.song.artist.localeCompare(b.song.artist, 'fi'),
   )
 
   // Sama biisi voi olla kannassa useana julkaisuna – näytetään vain yksi.
   const seen = new Set<string>()
-  const unique: Song[] = []
+  const unique: T[] = []
   for (const { song } of out) {
     const key = `${normalize(song.artist)}|${normalize(song.title)}`
     if (seen.has(key)) continue

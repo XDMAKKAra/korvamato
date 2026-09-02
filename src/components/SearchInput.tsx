@@ -1,22 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Song } from '../types'
+import type { CatalogEntry } from '../types'
 import { searchSongs } from '../game/match'
 
 interface Props {
-  songs: Song[]
+  /**
+   * Hakuluettelo, ei pelattava kanta. Luettelo on moninkertaisesti laajempi,
+   * joten ehdotuksista ei voi päätellä mistä joukosta vastaus on arvottu.
+   */
+  catalog: CatalogEntry[]
   disabled: boolean
-  onPick: (song: Song) => void
+  onPick: (entry: CatalogEntry) => void
   /** Ilmoittaa parentille parhaiten täsmäävän ehdotuksen – "Arvaa"-nappia varten. */
-  onTopMatchChange?: (song: Song | null) => void
+  onTopMatchChange?: (entry: CatalogEntry | null) => void
 }
 
-export function SearchInput({ songs, disabled, onPick, onTopMatchChange }: Props) {
+export function SearchInput({ catalog, disabled, onPick, onTopMatchChange }: Props) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [cursor, setCursor] = useState(0)
   const boxRef = useRef<HTMLDivElement>(null)
 
-  const results = useMemo(() => searchSongs(query, songs), [query, songs])
+  const results = useMemo(() => searchSongs(query, catalog), [query, catalog])
 
   useEffect(() => setCursor(0), [query])
 
@@ -32,8 +36,8 @@ export function SearchInput({ songs, disabled, onPick, onTopMatchChange }: Props
     return () => document.removeEventListener('mousedown', onDocClick)
   }, [])
 
-  function choose(song: Song) {
-    onPick(song)
+  function choose(entry: CatalogEntry) {
+    onPick(entry)
     setQuery('')
     setOpen(false)
   }
@@ -63,7 +67,7 @@ export function SearchInput({ songs, disabled, onPick, onTopMatchChange }: Props
         <div className="suggestions" role="listbox">
           {results.map((song, i) => (
             <button
-              key={song.id}
+              key={`${song.artist}|${song.title}`}
               type="button"
               className={`suggestion${i === cursor ? ' cursor' : ''}`}
               onMouseEnter={() => setCursor(i)}
@@ -81,8 +85,10 @@ export function SearchInput({ songs, disabled, onPick, onTopMatchChange }: Props
       <input
         type="text"
         value={query}
-        disabled={disabled}
-        placeholder="Tunnistatko biisin? Kirjoita nimi tai artisti…"
+        disabled={disabled || catalog.length === 0}
+        placeholder={
+          catalog.length === 0 ? 'Ladataan biisiluetteloa…' : 'Tunnistatko biisin? Kirjoita nimi tai artisti…'
+        }
         autoComplete="off"
         autoCorrect="off"
         spellCheck={false}

@@ -5,15 +5,17 @@
  * toimivat. Lopuksi tarkistaa otoksella että ääninäytteiden osoitteet vastaavat.
  */
 import songsData from '../src/data/songs.json'
-import type { RunState, Song } from '../src/types'
+import catalogData from '../src/data/catalog.json'
+import type { CatalogEntry, RunState, Song } from '../src/types'
 import { MAX_GUESSES, MAX_SCORE, STAGES, TIERS, nextStageSeconds, roundContinues, scoreFor } from '../src/game/rules'
 import { dateKey, pickRun, puzzleNumber } from '../src/game/daily'
-import { isSameSong, normalize, searchSongs, songLabel } from '../src/game/match'
+import { guessMatches, isSameSong, normalize, searchSongs, songKey, songLabel } from '../src/game/match'
 import { buildShareText, runScore, solvedAtStage } from '../src/game/share'
 import { AXIS_SECONDS, headPercent, secondsToPercent, ticks, unlockedPercent } from '../src/game/timeline'
 import { ERAS, GENRES, filterKey, filterLabel, filterSongs } from '../src/game/categories'
 
 const SONGS = songsData as unknown as Song[]
+const CATALOG = catalogData as unknown as CatalogEntry[]
 
 let passed = 0
 let failed = 0
@@ -152,23 +154,21 @@ check('vihjepituudet ovat 0,2 / 0,5 / 2 / 5 / 8 / 15 s',
 check('0 s on akselin alussa', secondsToPercent(0) === 0, `${secondsToPercent(0)}%`)
 check('15 s on akselin lopussa', secondsToPercent(15) === 100, `${secondsToPercent(15)}%`)
 
-// Akseli on paloittain lineaarinen: jokainen vihjepituus saa yhtä leveän
-// lohkon. Suoralla sekuntimittakaavalla 0,2 / 0,5 / 2 s osuisivat kohtiin
-// 1,3 / 3,3 / 13 %, eli puolet pelistä mahtuisi janan ensimmäiseen
-// kahdeksasosaan eikä palkki näyttäisi etenevän lyhyillä vihjeillä.
-const segment = 100 / STAGES.length
-check('jokainen vihjepituus osuu oman lohkonsa rajalle',
-  STAGES.every((sec, i) => approx(secondsToPercent(sec), (i + 1) * segment, 0.001)),
-  STAGES.map((sec, i) => `${sec}s:${secondsToPercent(sec).toFixed(1)}%`).join(' '))
+// Akseli on lineaarinen sekunneissa: yksi sekunti on yhtä leveä janan joka
+// kohdassa. Aiempi paloittainen akseli antoi jokaiselle vihjeelle yhtä leveän
+// lohkon, jolloin soittopään nopeus kymmenkertaistui joka lohkon rajalla ja
+// sekuntiluvut osoittivat vääriin kohtiin (2 s janan puolivälissä).
+check('akseli on lineaarinen sekunneissa',
+  STAGES.every((sec) => approx(secondsToPercent(sec), (sec / AXIS_SECONDS) * 100, 0.001)),
+  STAGES.map((sec) => `${sec}s:${secondsToPercent(sec).toFixed(1)}%`).join(' '))
 
-check('lohkot ovat yhtä leveät',
-  STAGES.every((_s, i) => approx(
-    secondsToPercent(STAGES[i]) - (i === 0 ? 0 : secondsToPercent(STAGES[i - 1])), segment, 0.001)),
-  `lohko ${segment.toFixed(1)}%`)
+check('yhtä pitkät pätkät ovat yhtä leveitä janan eri kohdissa',
+  approx(secondsToPercent(6) - secondsToPercent(5), secondsToPercent(13) - secondsToPercent(12), 0.001),
+  `${(secondsToPercent(6) - secondsToPercent(5)).toFixed(3)}% vs ${(secondsToPercent(13) - secondsToPercent(12)).toFixed(3)}%`)
 
-check('aika kulkee tasaisesti lohkon sisällä',
-  approx(secondsToPercent(0.1), segment / 2, 0.001) && approx(secondsToPercent(0.35), segment * 1.5, 0.001),
-  `0,1s=${secondsToPercent(0.1).toFixed(1)}% 0,35s=${secondsToPercent(0.35).toFixed(1)}%`)
+check('puolet ajasta on puolivälissä janaa',
+  approx(secondsToPercent(AXIS_SECONDS / 2), 50, 0.001),
+  `${secondsToPercent(AXIS_SECONDS / 2).toFixed(1)}%`)
 
 check('akseli kasvaa aidosti eikä hyppää taaksepäin',
   (() => {
@@ -180,6 +180,20 @@ check('akseli kasvaa aidosti eikä hyppää taaksepäin',
     }
     return true
   })(), 'sekunnit 0…15,5 s')
+
+// Soittopään nopeus on sama koko janan matkalla – juuri tämä oli rikki, kun
+// akseli oli paloittainen: pää ampaisi kolmanneksen janasta puolessa
+// sekunnissa ja madelsi sitten loput kolmetoista.
+check('soittopää liikkuu tasaisella nopeudella koko janan matkan',
+  (() => {
+    const speed = (from: number, to: number) => (headPercent(to) - headPercent(from)) / (to - from)
+    const first = speed(0, 0.5)
+    for (let sec = 0; sec < 14.5; sec += 0.5) {
+      if (!approx(speed(sec, sec + 0.5), first, 0.001)) return false
+    }
+    return true
+  })(),
+  `${((headPercent(1) - headPercent(0)) * 1).toFixed(2)} %/s`)
 
 check('avattu alue vastaa vihjetason sekunteja',
   STAGES.every((s, i) => unlockedPercent(i) === secondsToPercent(s)),
@@ -204,35 +218,29 @@ check('merkit ovat nousevassa järjestyksessä',
   t0.every((t, i) => i === 0 || t.percent > t0[i - 1].percent),
   t0.map((t) => t.percent.toFixed(1)).join(' '))
 
-check('nimetyt luvut eivät mene päällekkäin',
-  (() => {
-    const on = t0.filter((t) => t.labelled).map((t) => t.percent)
-    return on.every((p, i) => i === 0 || p - on[i - 1] >= 7)
-  })(),
-  t0.filter((t) => t.labelled).map((t) => t.seconds + 's').join(' '))
+// Lineaarisella akselilla 0,2 s ja 0,5 s ovat 2 % päässä toisistaan, joten
+// luvut on pakko valita – mutta koskaan ne eivät saa mennä päällekkäin.
+check('nimetyt luvut eivät mene päällekkäin millään vihjetasolla',
+  STAGES.every((_s, i) => {
+    const on = ticks(i).filter((t) => t.labelled).map((t) => t.percent).sort((a, b) => a - b)
+    return on.every((p, j) => j === 0 || p - on[j - 1] >= 9)
+  }),
+  'kaikki tasot')
 
 check('nykyisen vihjeen luku näytetään aina, myös ahtaimmassa kohdassa',
   STAGES.every((_s, i) => ticks(i)[i].labelled),
   'kaikki tasot')
 
-// Tasalevyisillä lohkoilla merkkien väli on ~16,7 %, joten mitään ei tarvitse
-// enää piilottaa – pelaaja näkee kaikki vihjepituudet kerralla.
-check('kaikki sekuntiluvut mahtuvat näkyviin',
-  ticks(0).every((t) => t.labelled),
-  ticks(0).filter((t) => !t.labelled).map((t) => t.seconds + 's').join(' ') || 'kaikki nimetty')
+check('janan pää on aina nimetty, jotta mittakaava näkyy',
+  STAGES.every((_s, i) => ticks(i)[STAGES.length - 1].labelled),
+  'kaikki tasot')
 
-// Soittopään pitää liikkua havaittavasti myös lyhimmällä vihjeellä. Tämä on
-// se bugi jonka takia akseli jaettiin lohkoihin: 0,2 s liikutti soittopäätä
-// suoralla mittakaavalla 1,3 % eli pari pikseliä.
-check('soittopää liikkuu havaittavasti lyhimmälläkin vihjeellä',
-  headPercent(STAGES[0]) >= 15, `${headPercent(STAGES[0]).toFixed(1)}%`)
+check('luvuista näytetään valtaosa',
+  STAGES.every((_s, i) => ticks(i).filter((t) => t.labelled).length >= STAGES.length - 1),
+  STAGES.map((_s, i) => `${i}:${ticks(i).filter((t) => t.labelled).length}`).join(' '))
 
-check('soittopää on lohkon puolivälissä kun puolet klipistä on soinut',
-  approx(headPercent(STAGES[0] / 2), segment / 2, 0.001),
-  `${headPercent(STAGES[0] / 2).toFixed(1)}%`)
-
-// Soittopää ei saa karata avatun alueen ulkopuolelle: pisin klippi päättyy
-// täsmälleen janan loppuun, eikä ylimenevä aika työnnä sitä yli.
+// Soittopään pitää pysähtyä janan loppuun eikä ylimenevä aika saa työntää
+// sitä yli.
 check('soittopää pysähtyy janan loppuun',
   headPercent(AXIS_SECONDS) === 100 && headPercent(999) === 100,
   `${headPercent(999)}%`)
@@ -276,6 +284,57 @@ check('sama biisi tunnistetaan eri julkaisusta',
 
 check('eri biisejä ei sekoiteta',
   !isSameSong(SONGS[0], SONGS[1]))
+
+/* ---------- 4b. hakuluettelo ei saa vuotaa vastausta ---------- */
+
+section('Hakuluettelo')
+
+const answerKey = songKey
+const catalogKeys = new Set(CATALOG.map((c) => answerKey(c.artist, c.title)))
+const playableKeys = new Set(SONGS.map((s) => answerKey(s.artist, s.title)))
+
+// Ilman tätä oikeaa vastausta ei voisi kirjoittaa hakukenttään lainkaan.
+const notInCatalog = SONGS.filter((s) => !catalogKeys.has(answerKey(s.artist, s.title)))
+check('jokainen pelattava biisi löytyy hakuluettelosta', notInCatalog.length === 0,
+  notInCatalog.slice(0, 3).map((s) => songLabel(s)).join(', '))
+
+// Tämä on koko luettelon syy: jos ehdotukset tulisivat pelattavasta kannasta,
+// pudotusvalikko kertoisi mistä joukosta vastaus on arvottu.
+check('luettelo on selvästi pelattavaa kantaa laajempi', CATALOG.length >= SONGS.length * 2,
+  `${CATALOG.length} riviä vs. ${SONGS.length} pelattavaa (${(CATALOG.length / SONGS.length).toFixed(1)}×)`)
+
+const leakRatio = [...catalogKeys].filter((k) => playableKeys.has(k)).length / catalogKeys.size
+check('listalla näkyminen ei kerro onko biisi vastaus', leakRatio <= 0.5,
+  `${(leakRatio * 100).toFixed(0)} % luettelon riveistä on pelattavia`)
+
+// Sama artistitasolla: artistin ainoa listalla näkyvä biisi olisi varma arvaus.
+const busyArtists = [...new Set(SONGS.slice(0, 400).map((s) => s.artist))].slice(0, 60)
+// Poikkeus: harvinainen yhteistyökrediitti ("Behm & Olavi Uusivirta") on
+// luettelossa vain sillä yhdellä biisillä. Sitä ei voi korjata luettelon
+// laajuudella – nimeä ei myöskään kirjoita kukaan joka ei jo tiedä vastausta.
+const soloHits = busyArtists.filter((a) => searchSongs(a, CATALOG, 8).length < 2)
+check('artistihaku tarjoaa lähes aina useamman kuin yhden vaihtoehdon',
+  soloHits.length <= busyArtists.length * 0.05,
+  soloHits.join(', ') || 'ei yhden osuman artisteja')
+
+const mixed = busyArtists.filter((a) => {
+  const hits = searchSongs(a, CATALOG, 8)
+  return hits.some((h) => !playableKeys.has(answerKey(h.artist, h.title)))
+})
+check('ehdotuksissa on myös biisejä joita ei voi arvottua vastaukseksi',
+  mixed.length >= busyArtists.length * 0.5,
+  `${mixed.length}/${busyArtists.length} artistilla sekalainen ehdotuslista`)
+
+// Arvauksen vertailu tehdään nimien perusteella, koska luettelorivillä ei ole id:tä.
+const target = SONGS[0]
+check('luettelosta valittu oikea nimi tunnistetaan oikeaksi',
+  guessMatches({ artist: target.artist, title: target.title }, target),
+  songLabel(target))
+check('feat-lisäke ei estä tunnistusta',
+  guessMatches({ artist: target.artist, title: `${target.title} (feat. Joku)` }, target))
+check('eri biisi ei mene läpi oikeana',
+  !guessMatches({ artist: SONGS[1].artist, title: SONGS[1].title }, target) ||
+    isSameSong(SONGS[0], SONGS[1]))
 
 /* ---------- 5. kierroksen kulku ja jakoteksti ---------- */
 
@@ -328,7 +387,7 @@ check('ratkeamaton rivi on kokonaan punainen',
 
 section('Kategoriat (genre × aikakausi)')
 
-// Käydään läpi kaikki 12 genre×aikakausi-yhdistelmää. Jakauma on ohut
+// Käydään läpi kaikki tarjolla olevat genre×aikakausi-yhdistelmät. Jakauma on ohut
 // (esim. rap/2020 tai iskelmä voi olla lähes tyhjä) ja kasvaa datan mukana,
 // joten emme oleta kiinteitä lukumääriä – vain että suodatus ei kaadu ja
 // palauttaa vain oikeaan kategoriaan kuuluvia biisejä.
@@ -359,7 +418,16 @@ for (const era of ERAS) {
       picks.every((s) => s.era === era.id && s.genre === genre.id))
   }
 }
-check('kaikki 12 genre×aikakausi-yhdistelmää käytiin läpi', combosChecked === 12, `${combosChecked}`)
+check('kaikki tarjolla olevat genre×aikakausi-yhdistelmät käytiin läpi',
+  combosChecked === GENRES.length * ERAS.length, `${combosChecked}`)
+
+// Rappi on kannassa mutta ei genrenapeissa: räppibiisit tulevat vastaan
+// sekoituksessa, omaa suodatinta niille ei tarjota.
+check('rappi ei ole valittavissa genrenä', !GENRES.some((g) => g.id === 'rap'),
+  GENRES.map((g) => g.id).join(' '))
+check('räppibiisit ovat yhä kannassa ja sekoituksessa',
+  SONGS.some((s) => s.genre === 'rap') && filterSongs(SONGS, { era: null, genre: null }).some((s) => s.genre === 'rap'),
+  `${SONGS.filter((s) => s.genre === 'rap').length} räppibiisiä`)
 check('vähintään osa kategorioista on pelattavissa', combosNonEmpty > 0, `${combosNonEmpty}/12 ei-tyhjää`)
 
 check('filterKey on vakaa ja erottelee yhdistelmät',

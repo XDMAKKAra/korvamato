@@ -243,18 +243,24 @@ input { font: inherit; color: inherit; }
   background: var(--surface-3);
   overflow: hidden;
 }
-/* Avattu alue kasvaa vihje vihjeeltä samalla janalla. */
+/* Avattu alue kasvaa vihje vihjeeltä samalla janalla. Lyhin vihje on 1,3 %
+   janasta, joten vähimmäisleveys pitää sen näkyvissä – pelkkä ilme, akselin
+   laskenta pysyy lineaarisena. */
 .stagebar-unlocked {
   position: absolute; inset: 0 auto 0 0;
+  min-width: 4px;
   border-radius: var(--r-full);
   background: var(--accent);
   opacity: 0.45;
   transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 /* Jo soitettu osuus tästä toistosta. Ei siirtymää: päivittyy joka framella
-   äänen omasta kellosta, ja CSS-transition jäisi siitä jälkeen. */
+   äänen omasta kellosta, ja CSS-transition jäisi siitä jälkeen. Leveys ja
+   näkyvyys tulevat suoraan rAF-silmukasta (ks. useClipProgress). */
 .stagebar-played {
   position: absolute; inset: 0 auto 0 0;
+  width: 0;
+  opacity: 0;
   border-radius: var(--r-full);
   background: var(--accent);
 }
@@ -270,8 +276,10 @@ input { font: inherit; color: inherit; }
 /* Soittopää eli soitetun osuuden kärki. Ei siirtymää samasta syystä. */
 .stagebar-head {
   position: absolute; top: -3px; bottom: -3px;
+  left: 0;
   width: 3px;
   margin-left: -1.5px;
+  opacity: 0;
   border-radius: var(--r-full);
   background: #fff;
   box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
@@ -290,6 +298,22 @@ input { font: inherit; color: inherit; }
 
 /* soittonappi */
 .play-row { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); }
+/* Napin ja sen edistymisrenkaan yhteinen kehys. */
+.play-wrap { position: relative; width: 72px; height: 72px; flex: none; }
+/* Rengas kiertää napin ulkopuolella: se kertoo kuinka pitkällä tämä toisto
+   on, kun taas aikajana kertoo kuinka paljon biisistä on auki. Renkaan takia
+   0,2 sekunnin vihjekin näyttää etenevän. */
+.play-ring {
+  position: absolute; inset: -7px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s;
+}
+.play-wrap.playing .play-ring { opacity: 1; }
+.play-ring circle { fill: none; stroke-width: 3; stroke-linecap: round; }
+.play-ring-track { stroke: var(--surface-3); }
+/* Ei siirtymää: arvo kirjoitetaan joka framella äänen omasta kellosta. */
+.play-ring-fill { stroke: var(--accent); }
 .play-btn {
   width: 72px; height: 72px; flex: none;
   border-radius: 50%;

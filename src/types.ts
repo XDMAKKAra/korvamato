@@ -33,11 +33,28 @@ export interface Song {
   plays: number
 }
 
+/**
+ * Rivi hakuluettelossa – siis se mitä pelaaja voi kirjoittaa ja arvata.
+ *
+ * Luettelo (`src/data/catalog.json`) on moninkertaisesti pelattavaa kantaa
+ * laajempi, eikä rivillä siksi ole id:tä, ääninäytettä eikä kansikuvaa: rivi
+ * ei ole biisi vaan pelkkä nimi. Jos ehdotukset tulisivat pelattavasta
+ * kannasta, pudotusvalikko kertoisi mistä joukosta vastaus on – ja jos
+ * artistilta näkyisi vain yksi biisi, arvaus olisi varma.
+ */
+export interface CatalogEntry {
+  artist: string
+  title: string
+  fullTitle?: string
+  artists?: string[]
+  plays?: number
+}
+
 export type GuessKind = 'vaara' | 'ohitus' | 'oikein'
 
 export interface Guess {
   kind: GuessKind
-  /** Arvatun biisin id, jos käyttäjä valitsi ehdotuslistalta. */
+  /** Arvatun biisin id, jos arvaus osui pelattavaan kantaan. */
   songId?: string
   /** Näytettävä teksti, esim. "Apulanta – Anna mulle piiskaa". */
   label?: string

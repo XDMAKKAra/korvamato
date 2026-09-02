@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import songsData from './data/songs.json'
-import type { RoundStatus, RunState, Song } from './types'
+import type { CatalogEntry, RoundStatus, RunState, Song } from './types'
 import { MAX_GUESSES, STAGES, formatSeconds, nextStageSeconds, roundContinues, scoreFor, tierInfo } from './game/rules'
 import { pickRun, randomRunKey } from './game/daily'
 import { player } from './game/audio'
-import { isSameSong, normalize, songLabel } from './game/match'
+import { guessMatches, normalize, songLabel } from './game/match'
 import { loadFilter, loadRun, recordFinish, saveFilter, saveRun } from './game/storage'
 import { perfectCount, runScore, solvedAtStage } from './game/share'
 import { filterLabel, filterSongs, type Filter } from './game/categories'
@@ -20,6 +20,28 @@ import { CategoryPicker } from './components/CategoryPicker'
 import { PlayButton } from './components/PlayButton'
 
 const SONGS = songsData as unknown as Song[]
+
+/**
+ * Hakuluettelo ladataan omana palanaan heti käynnistyksen jälkeen.
+ *
+ * Luettelo on 31 000 riviä eli pakattunakin satoja kilotavuja, eikä sitä
+ * tarvita ennen kuin pelaaja kirjoittaa ensimmäisen arvauksensa – siihen
+ * mennessä hän on kuunnellut ainakin yhden vihjeen. Staattisena importtina se
+ * viivyttäisi ensimmäistä ruudunpiirtoa turhaan.
+ */
+function useCatalog(): CatalogEntry[] {
+  const [catalog, setCatalog] = useState<CatalogEntry[]>([])
+  useEffect(() => {
+    let alive = true
+    void import('./data/catalog.json').then((mod) => {
+      if (alive) setCatalog(mod.default as unknown as CatalogEntry[])
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+  return catalog
+}
 
 /**
  * Rakentaa uuden kierroksen valitusta kategoriasta. Palauttaa null jos
@@ -50,6 +72,7 @@ function isUsable(run: RunState | null): run is RunState {
 
 export default function App() {
   const [filter, setFilter] = useState<Filter>(() => loadFilter())
+  const catalog = useCatalog()
 
   const [run, setRun] = useState<RunState | null>(() => {
     const saved = loadRun()
@@ -58,17 +81,15 @@ export default function App() {
 
   const [playing, setPlaying] = useState(false)
   const [loading, setLoading] = useState(false)
-  // Kuluneet sekunnit nykyisestä klipistä, tai null kun ei soiteta. Luetaan
-  // suoraan äänen omasta kellosta (ks. player.elapsed()), ei erillisestä
-  // performance.now()-ajastimesta – näin animaatio ei voi ajautua äänestä
-  // erilleen.
-  const [elapsed, setElapsed] = useState<number | null>(null)
+  // Kuluneita sekunteja ei pidetä täällä tilana. Aikajana ja soittonapin
+  // rengas lukevat kellon suoraan äänimoottorilta joka framella ja
+  // kirjoittavat sen DOM:iin (ks. game/useClipProgress.ts). Tila renderöisi
+  // koko sovelluksen 60 kertaa sekunnissa ja pudottaisi frameja.
   const [modal, setModal] = useState<'ohjeet' | 'tilastot' | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   /** Hakukentän parhaiten täsmäävä ehdotus – "Arvaa"-nappia varten. */
-  const [topMatch, setTopMatch] = useState<Song | null>(null)
+  const [topMatch, setTopMatch] = useState<CatalogEntry | null>(null)
 
-  const rafRef = useRef<number | null>(null)
   const playTokenRef = useRef(0)
   const recordedRef = useRef<string | null>(null)
 
@@ -111,10 +132,7 @@ export default function App() {
 
   // Kierroksen vaihtuessa ääni poikki.
   useEffect(() => {
-    return () => {
-      player.stop()
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-    }
+    return () => player.stop()
   }, [])
 
   /* ---------- soitto ---------- */
@@ -122,12 +140,7 @@ export default function App() {
   const stopPlayback = useCallback(() => {
     playTokenRef.current++
     player.stop()
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current)
-      rafRef.current = null
-    }
     setPlaying(false)
-    setElapsed(null)
     // Myös lataus perutaan. handlePlay poistuu latauksen jälkeen hiljaa kun
     // sen vuoro on mitätöity, joten ilman tätä `loading` jäisi päälle ja
     // soittonappi pysyisi lopullisesti pois käytöstä.
@@ -149,29 +162,14 @@ export default function App() {
     await player.preload(song)
     if (token !== playTokenRef.current) return
     setLoading(false)
+
+    // `playing` on ainoa signaali animaatiolle: se käynnistää aikajanan ja
+    // renkaan rAF-silmukan, joka lukee kellon suoraan äänimoottorilta.
     setPlaying(true)
-    setElapsed(0)
-
-    // player.play() ajastaa äänen alkamaan hieman kutsuhetken jälkeen (Web
-    // Audiolla tarkka t0). Kello luetaan siis suoraan äänimoottorista eikä
-    // performance.now()-erosta, jotta animaatio ei lähde ennen ääntä.
-    const tick = () => {
-      if (token !== playTokenRef.current) return
-      const e = player.elapsed()
-      // Klippiä voidaan pidentää kesken soiton (ohitus/väärä arvaus), joten
-      // yläraja luetaan soittimelta eikä kutsuhetken `duration`-arvosta.
-      if (e !== null) setElapsed(Math.min(player.currentDuration() || duration, e))
-      rafRef.current = requestAnimationFrame(tick)
-    }
-    rafRef.current = requestAnimationFrame(tick)
-
     await player.play(song, duration)
 
     if (token !== playTokenRef.current) return
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-    rafRef.current = null
     setPlaying(false)
-    setElapsed(null)
   }, [song, playing, revealed, stageIndex, stopPlayback])
 
   // Välilyönti soittaa vihjeen, kun kirjoituskenttä ei ole aktiivinen.
@@ -218,14 +216,14 @@ export default function App() {
   )
 
   const handlePick = useCallback(
-    (picked: Song) => {
+    (picked: CatalogEntry) => {
       if (!song || revealed) return
-      if (isSameSong(picked, song)) {
-        applyGuess({ kind: 'oikein', songId: picked.id, label: songLabel(picked) })
+      // Vertailu nimien perusteella: luettelorivillä ei ole id:tä (ks. CATALOG).
+      if (guessMatches(picked, song)) {
+        applyGuess({ kind: 'oikein', songId: song.id, label: songLabel(picked) })
       } else {
         applyGuess({
           kind: 'vaara',
-          songId: picked.id,
           label: songLabel(picked),
           artistHit: normalize(picked.artist) === normalize(song.artist),
         })
@@ -356,7 +354,7 @@ export default function App() {
             />
           ) : (
             <>
-              <StageBar stageIndex={stageIndex} elapsed={elapsed} />
+              <StageBar stageIndex={stageIndex} playing={playing} />
 
               <div className="play-row">
                 <PlayButton playing={playing} loading={loading} onClick={handlePlay} />
@@ -377,7 +375,7 @@ export default function App() {
 
               <SearchInput
                 key={round.guesses.length}
-                songs={SONGS}
+                catalog={catalog}
                 disabled={revealed}
                 onPick={handlePick}
                 onTopMatchChange={setTopMatch}

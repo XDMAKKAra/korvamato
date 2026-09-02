@@ -1,6 +1,6 @@
 import type { RunState, Stats } from '../types'
 import type { Filter } from './categories'
-import { ALL } from './categories'
+import { ALL, ERAS, GENRES } from './categories'
 
 /**
  * Kesken oleva kierros. Yksi avain riittää, koska pelissä on vain yksi
@@ -78,7 +78,13 @@ export function recordFinish(score: number, perfectRounds: number): Stats {
 export function loadFilter(): Filter {
   const raw = read<Partial<Filter>>(FILTER_KEY)
   if (!raw) return ALL
-  return { era: raw.era ?? null, genre: raw.genre ?? null }
+  // Tallennettu genre voi olla sellainen jota ei enää tarjota (rappi
+  // poistettiin valikosta). Se jäisi näkymättömäksi suodattimeksi: pelaaja saisi
+  // vain räppiä eikä yksikään nappi näyttäisi valitulta. Tuntematon arvo
+  // pudotetaan takaisin kaikkiin.
+  const genre = GENRES.some((g) => g.id === raw.genre) ? raw.genre! : null
+  const era = ERAS.some((e) => e.id === raw.era) ? raw.era! : null
+  return { era, genre }
 }
 
 export function saveFilter(filter: Filter): void {

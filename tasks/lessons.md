@@ -115,3 +115,51 @@ numerolla ja tarkista se ennen kuin kosket jaettuun tilaan.
 
 **Tarkistus:** Tällaista ei näe koodia lukemalla — se vaatii testin joka
 pysäyttää ja aloittaa uudelleen samassa vuorossa (`scripts/audiotest.ts`).
+
+## 10. Yksi setState per frame renderöi koko sovelluksen 60 kertaa sekunnissa
+
+**Mitä tapahtui:** Soittopään kulunut aika elettiin `useState`-tilassa, jota
+rAF-silmukka päivitti joka framella. Jokainen päivitys renderöi koko App-puun:
+biisirailin, joka hakee viisi biisiä lineaarisesti tuhansien biisien
+taulukosta, hakukentän ja arvauslistan. Frameja putosi ja animaatio näytti
+nykivältä — käyttäjän sanoin "ei mee smoothisti, ei ees mee eteenpäin".
+
+**Sääntö:** Framekohtainen arvo ei kuulu React-tilaan. Lue se lähteestä
+rAF-silmukassa ja kirjoita suoraan DOM:iin refin kautta. React renderöi kun
+*tila* muuttuu — "kello tikitti" ei ole tilan muutos.
+
+**Tarkistus:** Jos animaatio nykii, laske montako komponenttia renderöityy per
+frame ennen kuin optimoit itse animaatiota.
+
+## 11. Mittakaavan vääristäminen rikkoo sen mitä sen piti korjata
+
+**Mitä tapahtui:** Aikajana tehtiin paloittain lineaariseksi — jokainen
+vihjepituus sai yhtä leveän lohkon — jotta 0,2 sekunnin vihje näkyisi janalla.
+Lopputulos: soittopään nopeus kymmenkertaistui joka lohkon rajalla (83 %/s
+ensimmäisessä lohkossa, 2,4 %/s viimeisessä), ja sekuntiluvut osoittivat
+vääriin kohtiin — "2 s" istui janan puolivälissä. Käyttäjä näki molemmat:
+"timestampit on iha rikki" ja "ei mee smoothisti".
+
+**Sääntö:** Kun mittari ei näytä pientä arvoa, älä väännä mittarin asteikkoa.
+Anna pienelle arvolle **oma mittari**. Jana kertoo nyt kuinka paljon biisistä
+on auki (lineaarinen, rehellinen), soittonapin rengas kuinka pitkällä toisto
+on (aina täysi kierros, klipin pituudesta riippumatta).
+
+**Tarkistus:** `scripts/selftest.ts` vaatii tasaisen nopeuden koko janalta ja
+`scripts/audiotest.ts` ajaa oikean soittimen framet läpi jokaiselle
+vihjepituudelle.
+
+## 12. Laaja lista ei riitä, jos järjestys nostaa vastaukset kärkeen
+
+**Mitä tapahtui:** Hakukenttä ehdotti suoraan pelattavasta kannasta, eli
+näytti täsmälleen sen joukon josta vastaus arvottiin. Korjaus oli 31 000 rivin
+hakuluettelo — mutta ehdotukset lajiteltiin toistomäärän mukaan, ja pelattavaan
+kantaan valitaan juuri kuunnelluin kärki. Artistihaun kahdeksan ensimmäistä
+osumaa olivat yhä lähes aina mahdollisia vastauksia. Luettelo oli laaja, vuoto
+ennallaan.
+
+**Sääntö:** Kun piilotat jotain kohinaan, tarkista myös **järjestys**. Jos
+lajitteluperuste korreloi salaisuuden kanssa, kohina jää näkymättömiin.
+
+**Tarkistus:** Testi mittaa kuinka suuri osa ehdotuksista on oikeasti
+pelattavia — ei sitä kuinka monta riviä luettelossa on.

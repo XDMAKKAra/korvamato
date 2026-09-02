@@ -123,3 +123,43 @@ tuottavat täyden viiden biisin kierroksen.
 Kolme erillistä vikaa, yksi juurisyy kussakin — ei kiertoteitä. Testit:
 127 logiikkatarkistusta, 8 soitintarkistusta, 12 renderöintitarkistusta, 0
 hylättyä. `npm run build` menee läpi ilman tyyppivirheitä.
+
+---
+
+# Soittoanimaatio, biisikanta ja hakuvuoto
+
+## Tehty
+
+- [x] **Soittopää pois React-tilasta.** `useClipProgress` (src/game/useClipProgress.ts)
+      ajaa rAF-silmukkaa ja kirjoittaa arvot suoraan DOM:iin refin kautta.
+      Toisto ei renderöi sovellusta kertaakaan.
+- [x] **Aikajana takaisin lineaariseksi.** Paloittainen akseli poistettu:
+      sekuntiluvut osoittavat oikeisiin kohtiin ja soittopää liikkuu tasaisella
+      nopeudella koko janan matkan.
+- [x] **Edistymisrengas soittonapin ympärille.** Kiertää täyden kierroksen
+      klipin pituudesta riippumatta, joten 0,2 s näkyy yhtä hyvin kuin 15 s.
+- [x] **Kanta 3 908 → 6 770 biisiä** (`scripts/expand-library.mjs`, lokerokatto
+      400 → 800). Ei uutta verkkohakua: lisäbiisit ovat samoilta jo
+      hyväksytyiltä artisteilta ja ylittävät saman tunnettuuskynnyksen.
+- [x] **Rappi pois genrenapeista**, räppibiisit jäävät sekoitukseen.
+- [x] **Hakuluettelo erilleen pelattavasta kannasta** (`scripts/build-catalog.mjs`,
+      31 253 riviä, 4,6× kanta). Ehdotukset lajitellaan aakkosittain, ei
+      toistomäärän mukaan — muuten kärki olisi yhä pelkkiä mahdollisia
+      vastauksia.
+- [x] **Introt, skitit ja versiomerkinnät pois** sekä kannasta että luettelosta.
+- [x] **Sama biisi eri välilyönnein yhdistetty** ("Hei Neidit" / "Heineidit").
+- [x] **Hakuluettelo omaksi paketikseen** (dynaaminen import): ensilataus
+      1,31 MB → 0,89 MB pakattuna.
+
+## Todennus
+
+`npm test` — 128 logiikkatarkistusta, soittimen tilakone ja renderöinti läpi.
+Uudet testit: soittopään tasainen nopeus jokaisella vihjepituudella oikealla
+soittimella, ja mittaus siitä kuinka suuri osa hakuehdotuksista on oikeasti
+pelattavia.
+
+## Auki
+
+- Ohuet lokerot vaativat uuden Last.fm-haun: rokki 2020-luku 45 biisiä,
+  iskelmä 2020-luku 120, rokki 2010-luku 239, iskelmä 2010-luku 304. Muut
+  yhdeksän lokeroa ovat täydet (800).

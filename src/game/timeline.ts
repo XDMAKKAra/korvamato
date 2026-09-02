@@ -2,51 +2,33 @@
  * Aikajanan sijaintilaskenta omana puhtaana moduulinaan, jotta se on
  * testattavissa (ks. scripts/selftest.ts) ilman DOM:ia tai React-puuta.
  *
- * Akseli on **yhtenäinen 0…15 sekuntia** koko pelin ajan: palkki ei vaihda
- * mittakaavaansa vihjeiden välillä, vaan avattu alue kasvaa samalla janalla.
+ * Akseli on **yhtenäinen ja lineaarinen 0…15 sekuntia**: yksi sekunti on aina
+ * yhtä leveä riippumatta siitä missä kohtaa janaa ollaan. Sekuntiluvut ovat
+ * siis siellä missä pelaaja ne odottaakin – 2 s on kahdeksasosassa janaa, ei
+ * puolivälissä – ja soittopää liikkuu tasaisella nopeudella alusta loppuun.
  *
- * Akseli ei silti ole *lineaarinen* sekunneissa, koska vihjepituudet eivät ole
- * tasavälisiä: 0,2 / 0,5 / 2 / 5 / 8 / 15 s osuisivat suoraan mittakaavaan
- * kohtiin 1,3 %, 3,3 %, 13 %, 33 %, 53 % ja 100 %. Kolme ensimmäistä vihjettä
- * — eli puolet pelistä — mahtuisi janan ensimmäiseen kahdeksasosaan, jolloin
- * soittopää liikkuisi lyhyellä vihjeellä pari pikseliä eikä palkki näyttäisi
- * etenevän lainkaan.
+ * Aiemmin akseli oli paloittain lineaarinen: jokainen vihjepituus sai yhtä
+ * leveän lohkon, jotta lyhinkin vihje näkyisi janalla. Se korjasi väärän
+ * ongelman. Soittopään nopeus kymmenkertaistui joka lohkon rajalla (0,2 s
+ * lohko ehti 83 %/s, 15 s lohko 2,4 %/s), joten pisimmällä vihjeellä pää
+ * ampaisi kolmanneksen janasta puolessa sekunnissa ja madelsi sitten loput
+ * 13 sekuntia. Liike näytti nykivältä ja luvut valehtelivat.
  *
- * Siksi akseli on **paloittain lineaarinen**: jokainen vihjepituus saa yhtä
- * leveän lohkon, ja lohkon sisällä aika kulkee tasaisesti. Järjestys ja
- * suunta säilyvät (aika kasvaa aina vasemmalta oikealle), merkit jakautuvat
- * tasan koko janalle ja jokainen toisto vie soittopään täyden lohkon verran
- * eteenpäin – myös se 0,2 sekunnin isku.
+ * Lyhyen vihjeen näkyvyys ratkaistaan nyt siellä minne se kuuluu: soittonapin
+ * ympärillä on rengas, joka kiertää täyden kierroksen klipin pituudesta
+ * riippumatta (ks. PlayButton). Jana vastaa kysymykseen "kuinka paljon
+ * biisistä on auki", rengas kysymykseen "kuinka pitkällä tämä toisto on".
  */
 import { STAGES } from './rules'
 
 /** Aika-akselin pituus sekunteina: pisin vihje. */
 export const AXIS_SECONDS: number = STAGES[STAGES.length - 1]
 
-/** Yhden vihjelohkon leveys prosentteina. */
-const SEGMENT_PERCENT = 100 / STAGES.length
-
-/**
- * Sekunnit prosentteina akselilla, rajattuna 0–100 %:iin.
- *
- * Paikannus tehdään lohkoittain: etsitään se vihjeväli johon `seconds` osuu ja
- * interpoloidaan sen sisällä. Näin jokainen vihjepituus osuu täsmälleen oman
- * lohkonsa rajalle (0,2 s = 1/6, 0,5 s = 2/6, …, 15 s = 100 %).
- */
+/** Sekunnit prosentteina akselilla, rajattuna 0–100 %:iin. */
 export function secondsToPercent(seconds: number): number {
   if (!Number.isFinite(seconds) || seconds <= 0) return 0
   if (seconds >= AXIS_SECONDS) return 100
-
-  let from = 0
-  for (let i = 0; i < STAGES.length; i++) {
-    const to = STAGES[i]
-    if (seconds <= to) {
-      const withinSegment = (seconds - from) / (to - from)
-      return (i + withinSegment) * SEGMENT_PERCENT
-    }
-    from = to
-  }
-  return 100
+  return (seconds / AXIS_SECONDS) * 100
 }
 
 /** Nykyisen vihjetason klipin pituus sekunteina. */
@@ -75,23 +57,41 @@ export interface Tick {
 /**
  * Aikamerkit koko akselille.
  *
- * Viiva piirretään jokaiseen vihjepituuteen ja sekuntiluku sen alle. Tasa­
- * levyisillä lohkoilla merkkien väli on aina 100/6 ≈ 16,7 %, joten kaikki luvut
- * mahtuvat – mutta väljyystarkistus jää paikalleen, jottei vihjeiden määrän
- * kasvattaminen palauta päällekkäisiä numeroita huomaamatta. Nykyisen vihjeen
- * luku näytetään aina, jotta pelaaja näkee mihin asti hän juuri nyt kuulee.
+ * Viiva piirretään jokaiseen vihjepituuteen ja sekuntiluku sen alle. Lineaari-
+ * sella akselilla kaksi lyhintä vihjettä ovat 1,3 % ja 3,3 % kohdalla eli
+ * käytännössä päällekkäin, joten luvut valitaan tärkeysjärjestyksessä:
  *
- * @param stageIndex nykyinen vihjetaso – sen merkki nimetään aina
+ *   1. nykyinen vihje – pelaajan pitää nähdä mihin asti hän juuri nyt kuulee
+ *   2. akselin pää – jana on aina 15 sekuntia, ja se kannattaa sanoa
+ *   3. loput vasemmalta oikealle sikäli kuin väliin mahtuu
+ *
+ * Näin ahtaassakin kohdassa näkyvä luku on aina se merkityksellisin eikä
+ * numeroita koskaan piirretä toistensa päälle.
+ *
+ * @param stageIndex nykyinen vihjetaso – sen luku nimetään aina
  * @param minGapPercent pienin väli jolla kaksi lukua mahtuvat vierekkäin
  */
-export function ticks(stageIndex: number, minGapPercent = 8): Tick[] {
-  let lastLabelled = -Infinity
-  return STAGES.map((seconds, i) => {
-    const percent = secondsToPercent(seconds)
-    const isCurrent = i === stageIndex
-    const fits = percent - lastLabelled >= minGapPercent
-    const labelled = isCurrent || fits
-    if (labelled) lastLabelled = percent
-    return { seconds, percent, labelled }
-  })
+export function ticks(stageIndex: number, minGapPercent = 9): Tick[] {
+  const marks: Tick[] = STAGES.map((seconds) => ({
+    seconds,
+    percent: secondsToPercent(seconds),
+    labelled: false,
+  }))
+
+  const placed: number[] = []
+  const fits = (percent: number) => placed.every((p) => Math.abs(percent - p) >= minGapPercent)
+  const take = (i: number) => {
+    if (marks[i].labelled) return
+    marks[i].labelled = true
+    placed.push(marks[i].percent)
+  }
+
+  const current = Math.max(0, Math.min(marks.length - 1, stageIndex))
+  take(current)
+  if (fits(marks[marks.length - 1].percent)) take(marks.length - 1)
+  for (let i = 0; i < marks.length; i++) {
+    if (!marks[i].labelled && fits(marks[i].percent)) take(i)
+  }
+
+  return marks
 }
