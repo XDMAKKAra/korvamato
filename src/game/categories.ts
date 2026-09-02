@@ -18,15 +18,9 @@ export const ERAS: Category<Era>[] = [
   { id: 'klassikot', name: 'Klassikot 1970–2010', short: 'Klassikot' },
 ]
 
-/**
- * Valittavat genret.
- *
- * Rappi puuttuu tarkoituksella: räppibiisit ovat kannassa ja tulevat vastaan
- * sekoituksessa, mutta omaa suodatinnappia niille ei tarjota. Genrevalinta on
- * pelaajan mieltymys, ei kannan sisällysluettelo.
- */
 export const GENRES: Category<Genre>[] = [
   { id: 'rock', name: 'Rokki', short: 'Rokki' },
+  { id: 'rap', name: 'Rappi', short: 'Rappi' },
   { id: 'pop', name: 'Pop', short: 'Pop' },
   { id: 'iskelma', name: 'Iskelmä', short: 'Iskelmä' },
 ]

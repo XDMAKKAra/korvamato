@@ -12,7 +12,7 @@ import { dateKey, pickRun, puzzleNumber } from '../src/game/daily'
 import { guessMatches, isSameSong, normalize, searchSongs, songKey, songLabel } from '../src/game/match'
 import { buildShareText, runScore, solvedAtStage } from '../src/game/share'
 import { AXIS_SECONDS, headPercent, secondsToPercent, ticks, unlockedPercent } from '../src/game/timeline'
-import { ERAS, GENRES, filterKey, filterLabel, filterSongs } from '../src/game/categories'
+import { ERAS, GENRES, MIN_PLAYABLE, filterKey, filterLabel, filterSongs } from '../src/game/categories'
 
 const SONGS = songsData as unknown as Song[]
 const CATALOG = catalogData as unknown as CatalogEntry[]
@@ -421,13 +421,15 @@ for (const era of ERAS) {
 check('kaikki tarjolla olevat genre×aikakausi-yhdistelmät käytiin läpi',
   combosChecked === GENRES.length * ERAS.length, `${combosChecked}`)
 
-// Rappi on kannassa mutta ei genrenapeissa: räppibiisit tulevat vastaan
-// sekoituksessa, omaa suodatinta niille ei tarjota.
-check('rappi ei ole valittavissa genrenä', !GENRES.some((g) => g.id === 'rap'),
-  GENRES.map((g) => g.id).join(' '))
-check('räppibiisit ovat yhä kannassa ja sekoituksessa',
-  SONGS.some((s) => s.genre === 'rap') && filterSongs(SONGS, { era: null, genre: null }).some((s) => s.genre === 'rap'),
-  `${SONGS.filter((s) => s.genre === 'rap').length} räppibiisiä`)
+// Jokaiselle kannassa esiintyvälle genrelle on oltava oma nappi: muuten
+// biisejä tulee vastaan sekoituksessa ilman tapaa suodattaa niitä pois.
+const genresInData = [...new Set(SONGS.map((s) => s.genre))].sort()
+check('jokainen kannan genre on valittavissa',
+  genresInData.every((g) => GENRES.some((c) => c.id === g)),
+  genresInData.join(' '))
+check('jokainen genrenappi löytää biisejä',
+  GENRES.every((g) => filterSongs(SONGS, { era: null, genre: g.id }).length >= MIN_PLAYABLE),
+  GENRES.map((g) => `${g.id}:${filterSongs(SONGS, { era: null, genre: g.id }).length}`).join(' '))
 check('vähintään osa kategorioista on pelattavissa', combosNonEmpty > 0, `${combosNonEmpty}/12 ei-tyhjää`)
 
 check('filterKey on vakaa ja erottelee yhdistelmät',

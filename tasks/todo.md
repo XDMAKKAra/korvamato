@@ -141,7 +141,9 @@ hylättyä. `npm run build` menee läpi ilman tyyppivirheitä.
 - [x] **Kanta 3 908 → 6 770 biisiä** (`scripts/expand-library.mjs`, lokerokatto
       400 → 800). Ei uutta verkkohakua: lisäbiisit ovat samoilta jo
       hyväksytyiltä artisteilta ja ylittävät saman tunnettuuskynnyksen.
-- [x] **Rappi pois genrenapeista**, räppibiisit jäävät sekoitukseen.
+- [x] Rappi kokeiltiin poistaa genrenapeista ja palautettiin: kaikki kannan
+      genret ovat valittavissa. Suodatin on ainoa tapa välttää genre, koska
+      biisit ovat sekoituksessa mukana.
 - [x] **Hakuluettelo erilleen pelattavasta kannasta** (`scripts/build-catalog.mjs`,
       31 253 riviä, 4,6× kanta). Ehdotukset lajitellaan aakkosittain, ei
       toistomäärän mukaan — muuten kärki olisi yhä pelkkiä mahdollisia
