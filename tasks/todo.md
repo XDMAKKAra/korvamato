@@ -91,3 +91,35 @@ tuottavat täyden viiden biisin kierroksen.
 - [x] Skeema: 3 174 uniikkia id:tä, 0 virhettä, 0 duplikaattia, 0 hittikimaraa
 - [x] Ääninäytteet: 20/20 satunnaisotoksesta vastasi 200/206
 - [x] Kaikki 20 kategoriayhdistelmää tuottavat täyden kierroksen
+
+### 5. Soittonapin ja aikajanan korjaus
+- [x] **Soitin ei tunnistanut omaa ääntään.** `stop()` laukaisee edellisen
+      lähteen `onended`-tapahtuman, joka saapuu vasta tapahtumasilmukassa —
+      siis vasta kun seuraava klippi on jo käynnissä. Edellisen soiton
+      lopetuskoodi nollasi `source`/`playingId`/`clipStartCtxTime` uuden klipin
+      alta, jolloin Pysäytä ei pysäyttänyt mitään, aikajana jäi nollaan ja
+      `extend()` kieltäytyi pidentämästä. Korjaus: juokseva `generation`-numero,
+      purku vain jos soitto on yhä uusin.
+- [x] **Latausindikaattori jäi päälle lopullisesti.** `handlePlay` poistui
+      latauksen jälkeen hiljaa kun sen vuoro oli mitätöity (esim. Ohita
+      latauksen aikana) eikä nollannut `loading`ia — nappi jäi pois käytöstä.
+      Korjaus: `stopPlayback` nollaa myös latauksen.
+- [x] **Aikajana ei näyttänyt etenevän.** Suoralla sekuntimittakaavalla
+      0,2 / 0,5 / 2 s osuivat kohtiin 1,3 / 3,3 / 13 % — puolet pelistä janan
+      ensimmäisessä kahdeksasosassa. Akseli on nyt paloittain lineaarinen:
+      jokainen vihjepituus saa yhtä leveän lohkon (16,7 %), joten jokainen
+      toisto vie soittopään täyden lohkon eteenpäin ja kaikki sekuntiluvut
+      mahtuvat näkyviin.
+- [x] Soitettu osuus omana kerroksenaan: avattu alue himmeänä, tämä toisto
+      täytenä, soittopää kärkenä. Soittopää siirrettiin radan ulkopuolelle,
+      koska rata leikkaa sisältönsä eikä pää näkynyt janan lopussa.
+- [x] **Edistymisrengas pois soittonapin ympäriltä.** Se oli lisätty vain
+      korvaamaan liikkumaton aikajana. Kun jana liikkuu, rengas kertoi saman
+      asian toiseen kertaan ja näytti irralliselta kehältä.
+- [x] Uusi testi `npm run test:audio`: soittimen tilakone valeäänimoottorilla.
+      Todisti vian ennen korjausta (4/8 hylättyä) ja vartioi sitä nyt.
+
+## Katselmus
+Kolme erillistä vikaa, yksi juurisyy kussakin — ei kiertoteitä. Testit:
+127 logiikkatarkistusta, 8 soitintarkistusta, 12 renderöintitarkistusta, 0
+hylättyä. `npm run build` menee läpi ilman tyyppivirheitä.

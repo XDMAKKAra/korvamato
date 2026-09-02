@@ -2,20 +2,51 @@
  * Aikajanan sijaintilaskenta omana puhtaana moduulinaan, jotta se on
  * testattavissa (ks. scripts/selftest.ts) ilman DOM:ia tai React-puuta.
  *
- * Akseli on **yhtenäinen 0…15 sekuntia** koko pelin ajan, Songlessin tapaan:
- * palkki ei vaihda mittakaavaansa vihjeiden välillä, vaan avattu alue kasvaa
- * samalla janalla. Jokaisen vihjepituuden kohdalla on merkki, joten pelaaja
- * näkee kerralla missä on nyt ja kuinka paljon on vielä avattavissa.
+ * Akseli on **yhtenäinen 0…15 sekuntia** koko pelin ajan: palkki ei vaihda
+ * mittakaavaansa vihjeiden välillä, vaan avattu alue kasvaa samalla janalla.
+ *
+ * Akseli ei silti ole *lineaarinen* sekunneissa, koska vihjepituudet eivät ole
+ * tasavälisiä: 0,2 / 0,5 / 2 / 5 / 8 / 15 s osuisivat suoraan mittakaavaan
+ * kohtiin 1,3 %, 3,3 %, 13 %, 33 %, 53 % ja 100 %. Kolme ensimmäistä vihjettä
+ * — eli puolet pelistä — mahtuisi janan ensimmäiseen kahdeksasosaan, jolloin
+ * soittopää liikkuisi lyhyellä vihjeellä pari pikseliä eikä palkki näyttäisi
+ * etenevän lainkaan.
+ *
+ * Siksi akseli on **paloittain lineaarinen**: jokainen vihjepituus saa yhtä
+ * leveän lohkon, ja lohkon sisällä aika kulkee tasaisesti. Järjestys ja
+ * suunta säilyvät (aika kasvaa aina vasemmalta oikealle), merkit jakautuvat
+ * tasan koko janalle ja jokainen toisto vie soittopään täyden lohkon verran
+ * eteenpäin – myös se 0,2 sekunnin isku.
  */
 import { STAGES } from './rules'
 
 /** Aika-akselin pituus sekunteina: pisin vihje. */
 export const AXIS_SECONDS: number = STAGES[STAGES.length - 1]
 
-/** Sekunnit prosentteina koko akselilla, rajattuna 0–100 %:iin. */
+/** Yhden vihjelohkon leveys prosentteina. */
+const SEGMENT_PERCENT = 100 / STAGES.length
+
+/**
+ * Sekunnit prosentteina akselilla, rajattuna 0–100 %:iin.
+ *
+ * Paikannus tehdään lohkoittain: etsitään se vihjeväli johon `seconds` osuu ja
+ * interpoloidaan sen sisällä. Näin jokainen vihjepituus osuu täsmälleen oman
+ * lohkonsa rajalle (0,2 s = 1/6, 0,5 s = 2/6, …, 15 s = 100 %).
+ */
 export function secondsToPercent(seconds: number): number {
   if (!Number.isFinite(seconds) || seconds <= 0) return 0
-  return Math.max(0, Math.min(100, (seconds / AXIS_SECONDS) * 100))
+  if (seconds >= AXIS_SECONDS) return 100
+
+  let from = 0
+  for (let i = 0; i < STAGES.length; i++) {
+    const to = STAGES[i]
+    if (seconds <= to) {
+      const withinSegment = (seconds - from) / (to - from)
+      return (i + withinSegment) * SEGMENT_PERCENT
+    }
+    from = to
+  }
+  return 100
 }
 
 /** Nykyisen vihjetason klipin pituus sekunteina. */
@@ -44,10 +75,11 @@ export interface Tick {
 /**
  * Aikamerkit koko akselille.
  *
- * Viiva piirretään jokaiseen vihjepituuteen, mutta **sekuntiluku vain silloin
- * kun se mahtuu**: 0,2 s ja 0,5 s osuvat kohtiin 1,3 % ja 3,3 %, joten niiden
- * numerot menisivät päällekkäin. Nykyisen vihjeen luku näytetään aina, jotta
- * pelaaja näkee mihin asti hän juuri nyt kuulee.
+ * Viiva piirretään jokaiseen vihjepituuteen ja sekuntiluku sen alle. Tasa­
+ * levyisillä lohkoilla merkkien väli on aina 100/6 ≈ 16,7 %, joten kaikki luvut
+ * mahtuvat – mutta väljyystarkistus jää paikalleen, jottei vihjeiden määrän
+ * kasvattaminen palauta päällekkäisiä numeroita huomaamatta. Nykyisen vihjeen
+ * luku näytetään aina, jotta pelaaja näkee mihin asti hän juuri nyt kuulee.
  *
  * @param stageIndex nykyinen vihjetaso – sen merkki nimetään aina
  * @param minGapPercent pienin väli jolla kaksi lukua mahtuvat vierekkäin
@@ -62,18 +94,4 @@ export function ticks(stageIndex: number, minGapPercent = 8): Tick[] {
     if (labelled) lastLabelled = percent
     return { seconds, percent, labelled }
   })
-}
-
-/**
- * Soiton eteneminen 0…1 nykyisestä klipistä.
- *
- * Tämä on eri asia kuin `headPercent`: jana kertoo kuinka pitkälle biisiin on
- * avattu (0,2 s on 1,3 % viidentoista sekunnin janasta), tämä kuinka pitkällä
- * yksittäinen toisto on. Soittonapin ympärillä kiertävä rengas käyttää tätä,
- * jolloin lyhyestäkin vihjeestä näkee että se etenee.
- */
-export function clipProgress(elapsedSeconds: number | null, clipDuration: number): number {
-  if (elapsedSeconds === null || !Number.isFinite(elapsedSeconds)) return 0
-  if (!Number.isFinite(clipDuration) || clipDuration <= 0) return 0
-  return Math.max(0, Math.min(1, elapsedSeconds / clipDuration))
 }

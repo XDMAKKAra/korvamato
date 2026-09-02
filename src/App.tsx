@@ -4,7 +4,6 @@ import type { RoundStatus, RunState, Song } from './types'
 import { MAX_GUESSES, STAGES, formatSeconds, nextStageSeconds, roundContinues, scoreFor, tierInfo } from './game/rules'
 import { pickRun, randomRunKey } from './game/daily'
 import { player } from './game/audio'
-import { clipProgress } from './game/timeline'
 import { isSameSong, normalize, songLabel } from './game/match'
 import { loadFilter, loadRun, recordFinish, saveFilter, saveRun } from './game/storage'
 import { perfectCount, runScore, solvedAtStage } from './game/share'
@@ -129,6 +128,10 @@ export default function App() {
     }
     setPlaying(false)
     setElapsed(null)
+    // Myös lataus perutaan. handlePlay poistuu latauksen jälkeen hiljaa kun
+    // sen vuoro on mitätöity, joten ilman tätä `loading` jäisi päälle ja
+    // soittonappi pysyisi lopullisesti pois käytöstä.
+    setLoading(false)
   }, [])
 
   const handlePlay = useCallback(async () => {
@@ -276,15 +279,6 @@ export default function App() {
     )
   }
 
-  /*
-   * Soiton eteneminen 0…1 NYKYISESTÄ klipistä. Tämä on eri asia kuin
-   * aikajanan soittopää: jana näyttää kuinka pitkälle biisiin on avattu
-   * (0,2 s on 1,3 % viidestätoista sekunnista), rengas kuinka pitkällä tämä
-   * toisto on. Ilman rengasta lyhyt vihje näyttäisi siltä ettei mikään liiku.
-   */
-  const clipDuration = revealed ? STAGES[STAGES.length - 1] : STAGES[stageIndex]
-  const progress = clipProgress(elapsed, clipDuration)
-
   const info = song ? tierInfo(song.tier) : null
   const solvedStage = run ? solvedAtStage(run, run.current) : -1
   const roundPoints = song && solvedStage >= 0 ? scoreFor(song.tier, solvedStage) : 0
@@ -365,12 +359,7 @@ export default function App() {
               <StageBar stageIndex={stageIndex} elapsed={elapsed} />
 
               <div className="play-row">
-                <PlayButton
-                  playing={playing}
-                  loading={loading}
-                  progress={progress}
-                  onClick={handlePlay}
-                />
+                <PlayButton playing={playing} loading={loading} onClick={handlePlay} />
 
                 <div className="play-meta">
                   <strong>

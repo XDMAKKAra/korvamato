@@ -8,8 +8,9 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "songs": "node scripts/build-library.mjs",
-    "test": "npm run test:logic && npm run test:render",
+    "test": "npm run test:logic && npm run test:audio && npm run test:render",
     "test:logic": "esbuild scripts/selftest.ts --bundle --platform=node --format=esm --outfile=node_modules/.tmp/selftest.mjs --log-level=warning && node node_modules/.tmp/selftest.mjs",
+    "test:audio": "esbuild scripts/audiotest.ts --bundle --platform=node --format=esm --outfile=node_modules/.tmp/audiotest.mjs --log-level=warning && node node_modules/.tmp/audiotest.mjs",
     "test:render": "esbuild scripts/rendertest.tsx --bundle --packages=external --platform=node --format=esm --jsx=automatic --outfile=node_modules/.tmp/rendertest.mjs --log-level=warning && node node_modules/.tmp/rendertest.mjs"
   },
   "dependencies": {

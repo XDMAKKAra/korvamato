@@ -233,6 +233,9 @@ input { font: inherit; color: inherit; }
  * Perustelu ks. src/game/timeline.ts.
  */
 .stagebar { display: flex; flex-direction: column; gap: var(--space-2); }
+/* Rata leikkaa sisältönsä pyöristettyjen päiden vuoksi; soittopää elää sen
+   ulkopuolella tässä kehyksessä, jotta se näkyy myös janan päissä. */
+.stagebar-rail { position: relative; }
 .stagebar-track {
   position: relative;
   height: 8px;
@@ -245,7 +248,15 @@ input { font: inherit; color: inherit; }
   position: absolute; inset: 0 auto 0 0;
   border-radius: var(--r-full);
   background: var(--accent);
+  opacity: 0.45;
   transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Jo soitettu osuus tästä toistosta. Ei siirtymää: päivittyy joka framella
+   äänen omasta kellosta, ja CSS-transition jäisi siitä jälkeen. */
+.stagebar-played {
+  position: absolute; inset: 0 auto 0 0;
+  border-radius: var(--r-full);
+  background: var(--accent);
 }
 /* Merkki jokaisessa vihjepituudessa. */
 .stagebar-tick {
@@ -256,13 +267,15 @@ input { font: inherit; color: inherit; }
   opacity: 0.75;
 }
 .stagebar-tick.on { opacity: 0.45; }
-/* Soittopää. Ei siirtymää: se päivittyy joka framella äänen omasta kellosta,
-   ja CSS-transition jarruttaisi sen jälkeen. */
+/* Soittopää eli soitetun osuuden kärki. Ei siirtymää samasta syystä. */
 .stagebar-head {
   position: absolute; top: -3px; bottom: -3px;
-  width: 2px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: var(--r-full);
   background: #fff;
   box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+  pointer-events: none;
 }
 .stagebar-labels { position: relative; height: 14px; }
 .stagebar-labels span {
@@ -275,15 +288,10 @@ input { font: inherit; color: inherit; }
 }
 .stagebar-labels span.on { color: var(--text); font-weight: 600; }
 
-/* soittonappi ja edistymisrengas */
+/* soittonappi */
 .play-row { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); }
-.play-wrap { position: relative; width: 84px; height: 84px; display: grid; place-items: center; }
-.play-ring { position: absolute; inset: 0; pointer-events: none; }
-.play-ring-track { stroke: var(--surface-3); }
-/* Ei siirtymää: rengas päivittyy joka framella äänen omasta kellosta. */
-.play-ring-value { stroke: var(--accent); }
 .play-btn {
-  width: 68px; height: 68px; flex: none;
+  width: 72px; height: 72px; flex: none;
   border-radius: 50%;
   display: grid; place-items: center;
   background: var(--accent);
@@ -552,8 +560,7 @@ input { font: inherit; color: inherit; }
   .card { padding: var(--space-4) var(--space-5); gap: var(--space-4); }
   .guesses { gap: 6px; }
   .guess { min-height: 34px; font-size: 12.5px; }
-  .play-wrap { width: 76px; height: 76px; }
-  .play-btn { width: 60px; height: 60px; }
+  .play-btn { width: 64px; height: 64px; }
   .search input { min-height: 44px; }
   .btn { min-height: 44px; }
   .rail-step { padding: var(--space-1) var(--space-1); }
@@ -592,8 +599,7 @@ input { font: inherit; color: inherit; }
   .card { padding: var(--space-3) var(--space-4); gap: var(--space-3); }
   .guesses { gap: 5px; }
   .guess { min-height: 30px; }
-  .play-wrap { width: 66px; height: 66px; }
-  .play-btn { width: 52px; height: 52px; }
+  .play-btn { width: 56px; height: 56px; }
   .play-row { gap: var(--space-2); }
   .rail-step { padding: 3px 2px; gap: var(--space-1); }
   .side { gap: var(--space-4); }

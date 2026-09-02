@@ -10,7 +10,7 @@ import { MAX_GUESSES, MAX_SCORE, STAGES, TIERS, nextStageSeconds, roundContinues
 import { dateKey, pickRun, puzzleNumber } from '../src/game/daily'
 import { isSameSong, normalize, searchSongs, songLabel } from '../src/game/match'
 import { buildShareText, runScore, solvedAtStage } from '../src/game/share'
-import { AXIS_SECONDS, clipProgress, headPercent, secondsToPercent, ticks, unlockedPercent } from '../src/game/timeline'
+import { AXIS_SECONDS, headPercent, secondsToPercent, ticks, unlockedPercent } from '../src/game/timeline'
 import { ERAS, GENRES, filterKey, filterLabel, filterSongs } from '../src/game/categories'
 
 const SONGS = songsData as unknown as Song[]
@@ -151,9 +151,35 @@ check('vihjepituudet ovat 0,2 / 0,5 / 2 / 5 / 8 / 15 s',
 // avattu alue kasvaa samalla janalla.
 check('0 s on akselin alussa', secondsToPercent(0) === 0, `${secondsToPercent(0)}%`)
 check('15 s on akselin lopussa', secondsToPercent(15) === 100, `${secondsToPercent(15)}%`)
-check('sekunnit kuvautuvat lineaarisesti',
-  approx(secondsToPercent(7.5), 50) && approx(secondsToPercent(3.75), 25),
-  `7,5s=${secondsToPercent(7.5).toFixed(1)}% 3,75s=${secondsToPercent(3.75).toFixed(1)}%`)
+
+// Akseli on paloittain lineaarinen: jokainen vihjepituus saa yhtä leveän
+// lohkon. Suoralla sekuntimittakaavalla 0,2 / 0,5 / 2 s osuisivat kohtiin
+// 1,3 / 3,3 / 13 %, eli puolet pelistä mahtuisi janan ensimmäiseen
+// kahdeksasosaan eikä palkki näyttäisi etenevän lyhyillä vihjeillä.
+const segment = 100 / STAGES.length
+check('jokainen vihjepituus osuu oman lohkonsa rajalle',
+  STAGES.every((sec, i) => approx(secondsToPercent(sec), (i + 1) * segment, 0.001)),
+  STAGES.map((sec, i) => `${sec}s:${secondsToPercent(sec).toFixed(1)}%`).join(' '))
+
+check('lohkot ovat yhtä leveät',
+  STAGES.every((_s, i) => approx(
+    secondsToPercent(STAGES[i]) - (i === 0 ? 0 : secondsToPercent(STAGES[i - 1])), segment, 0.001)),
+  `lohko ${segment.toFixed(1)}%`)
+
+check('aika kulkee tasaisesti lohkon sisällä',
+  approx(secondsToPercent(0.1), segment / 2, 0.001) && approx(secondsToPercent(0.35), segment * 1.5, 0.001),
+  `0,1s=${secondsToPercent(0.1).toFixed(1)}% 0,35s=${secondsToPercent(0.35).toFixed(1)}%`)
+
+check('akseli kasvaa aidosti eikä hyppää taaksepäin',
+  (() => {
+    let prev = -1
+    for (let sec = 0; sec <= 15.5; sec += 0.01) {
+      const p = secondsToPercent(sec)
+      if (p < prev) return false
+      prev = p
+    }
+    return true
+  })(), 'sekunnit 0…15,5 s')
 
 check('avattu alue vastaa vihjetason sekunteja',
   STAGES.every((s, i) => unlockedPercent(i) === secondsToPercent(s)),
@@ -189,33 +215,27 @@ check('nykyisen vihjeen luku näytetään aina, myös ahtaimmassa kohdassa',
   STAGES.every((_s, i) => ticks(i)[i].labelled),
   'kaikki tasot')
 
-check('0,5 s jää nimeämättä kun se ei ole nykyinen vihje',
-  ticks(0)[1].labelled === false, `labelled=${ticks(0)[1].labelled}`)
+// Tasalevyisillä lohkoilla merkkien väli on ~16,7 %, joten mitään ei tarvitse
+// enää piilottaa – pelaaja näkee kaikki vihjepituudet kerralla.
+check('kaikki sekuntiluvut mahtuvat näkyviin',
+  ticks(0).every((t) => t.labelled),
+  ticks(0).filter((t) => !t.labelled).map((t) => t.seconds + 's').join(' ') || 'kaikki nimetty')
 
-// Soittonapin rengas. Aikajanan soittopää ei voi näyttää lyhyen vihjeen
-// etenemistä (0,2 s on 1,3 % janasta eli pari pikseliä), joten rengas kiertää
-// aina täyden kierroksen klipin aikana. Ilman tätä lyhyt vihje näyttää siltä
-// ettei mikään liiku – juuri se oli bugiraportti.
-check('rengas on tyhjä klipin alussa jokaisella vihjeellä',
-  STAGES.every((s) => clipProgress(0, s) === 0), 'kaikki vihjeet')
+// Soittopään pitää liikkua havaittavasti myös lyhimmällä vihjeellä. Tämä on
+// se bugi jonka takia akseli jaettiin lohkoihin: 0,2 s liikutti soittopäätä
+// suoralla mittakaavalla 1,3 % eli pari pikseliä.
+check('soittopää liikkuu havaittavasti lyhimmälläkin vihjeellä',
+  headPercent(STAGES[0]) >= 15, `${headPercent(STAGES[0]).toFixed(1)}%`)
 
-check('rengas on täysi klipin lopussa jokaisella vihjeellä',
-  STAGES.every((s) => clipProgress(s, s) === 1),
-  STAGES.map((s) => `${s}s:${clipProgress(s, s)}`).join(' '))
+check('soittopää on lohkon puolivälissä kun puolet klipistä on soinut',
+  approx(headPercent(STAGES[0] / 2), segment / 2, 0.001),
+  `${headPercent(STAGES[0] / 2).toFixed(1)}%`)
 
-check('rengas on puolivälissä klipin puolivälissä jokaisella vihjeellä',
-  STAGES.every((s) => approx(clipProgress(s / 2, s), 0.5, 0.001)),
-  STAGES.map((s) => `${s}s:${clipProgress(s / 2, s).toFixed(2)}`).join(' '))
-
-check('rengas etenee lineaarisesti myös lyhyimmällä 0,2 s vihjeellä',
-  [0.25, 0.5, 0.75].every((f) => approx(clipProgress(STAGES[0] * f, STAGES[0]), f, 0.001)),
-  [0.25, 0.5, 0.75].map((f) => `${(f * 100).toFixed(0)}%:${clipProgress(STAGES[0] * f, STAGES[0]).toFixed(2)}`).join(' '))
-
-check('rengas ei ylitä täyttä eikä mene negatiiviseksi',
-  clipProgress(99, 0.2) === 1 && clipProgress(-5, 0.2) === 0, 'rajattu 0..1')
-
-check('rengas on tyhjä kun mikään ei soi', clipProgress(null, 0.2) === 0, 'null')
-check('nollapituinen klippi ei kaada laskentaa', clipProgress(1, 0) === 0, '0 s')
+// Soittopää ei saa karata avatun alueen ulkopuolelle: pisin klippi päättyy
+// täsmälleen janan loppuun, eikä ylimenevä aika työnnä sitä yli.
+check('soittopää pysähtyy janan loppuun',
+  headPercent(AXIS_SECONDS) === 100 && headPercent(999) === 100,
+  `${headPercent(999)}%`)
 
 /* ---------- 4. haku ---------- */
 
@@ -440,4 +460,4 @@ check('näytettävä nimi paljastaa feat-vieraan',
 
 console.log(`\n${'─'.repeat(40)}`)
 console.log(`Läpi: ${passed}   Hylätty: ${failed}`)
-if (failed > 0) process.exitCode = 1
+if (failed > 0) process.exitCode = 1

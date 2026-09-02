@@ -13,34 +13,44 @@ interface Props {
  *
  * Palkki pysyy samassa mittakaavassa koko pelin ajan: avattu alue kasvaa
  * vihje vihjeeltä samalla janalla sen sijaan että jokainen vihje piirtäisi
- * oman palkkinsa. Jokaisessa vihjepituudessa on merkki, ja sekuntiluku
- * näytetään aina kun se mahtuu päällekkäin menemättä.
+ * oman palkkinsa. Akselin lohkojako on `timeline.ts`:ssä.
+ *
+ * Kolme kerrosta, kolme eri kysymystä:
+ *   - `unlocked` — kuinka pitkälle biisi on avattu (kasvaa vihje vihjeeltä)
+ *   - `played`   — kuinka pitkälle tämä toisto on ehtinyt (liikkuu joka framella)
+ *   - `head`     — soittopää eli `played`-alueen kärki
+ *
+ * Soittopää on radan ulkopuolella sisaruksena, koska rata leikkaa sisältönsä
+ * (`overflow: hidden`) pyöristettyjen päiden vuoksi. Radan sisällä soittopää
+ * katoaisi näkyvistä juuri janan lopussa, missä sitä eniten katsotaan.
  */
 export function StageBar({ stageIndex, elapsed }: Props) {
   const unlocked = unlockedPercent(stageIndex)
   const marks = ticks(stageIndex)
+  const head = elapsed === null ? null : headPercent(elapsed)
 
   return (
     <div className="stagebar">
-      <div
-        className="stagebar-track"
-        role="progressbar"
-        aria-label="Vihjeen pituus aikajanalla"
-        aria-valuemin={0}
-        aria-valuemax={AXIS_SECONDS}
-        aria-valuenow={elapsed ?? 0}
-      >
-        <div className="stagebar-unlocked" style={{ width: `${unlocked}%` }} />
-        {marks.map((t) => (
-          <span
-            key={t.seconds}
-            className={`stagebar-tick${t.percent <= unlocked ? ' on' : ''}`}
-            style={{ left: `${t.percent}%` }}
-          />
-        ))}
-        {elapsed !== null && (
-          <div className="stagebar-head" style={{ left: `${headPercent(elapsed)}%` }} />
-        )}
+      <div className="stagebar-rail">
+        <div
+          className="stagebar-track"
+          role="progressbar"
+          aria-label="Vihjeen pituus aikajanalla"
+          aria-valuemin={0}
+          aria-valuemax={AXIS_SECONDS}
+          aria-valuenow={elapsed ?? 0}
+        >
+          <div className="stagebar-unlocked" style={{ width: `${unlocked}%` }} />
+          {head !== null && <div className="stagebar-played" style={{ width: `${head}%` }} />}
+          {marks.map((t) => (
+            <span
+              key={t.seconds}
+              className={`stagebar-tick${t.percent <= unlocked ? ' on' : ''}`}
+              style={{ left: `${t.percent}%` }}
+            />
+          ))}
+        </div>
+        {head !== null && <div className="stagebar-head" style={{ left: `${head}%` }} />}
       </div>
 
       <div className="stagebar-labels">
@@ -52,9 +62,10 @@ export function StageBar({ stageIndex, elapsed }: Props) {
               className={t.percent <= unlocked ? 'on' : ''}
               style={{
                 left: `${t.percent}%`,
-                // Ensimmäinen ja viimeinen kiinnitetään reunoihin, muut keskitetään.
-                transform:
-                  i === 0 ? 'translateX(0)' : i === all.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
+                // Luku keskitetään merkkinsä kohdalle. Viimeinen on janan
+                // päässä, joten se vedetään kokonaan vasemmalle ettei se
+                // valuisi kortin reunan yli.
+                transform: i === all.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
               }}
             >
               {formatSeconds(t.seconds)}

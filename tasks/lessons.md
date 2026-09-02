@@ -86,3 +86,32 @@ näkyviin sirunappeina, jolloin valintaa ei tarvitse kaivaa esiin.
 
 **Sääntö:** Kun tehtävässä on mittaluku jota ei ole annettu, kysy se tai esitä
 ehdotus näkyvästi — älä hautaa omaa arvaustasi toteutukseen.
+
+## 8. Älä paikkaa rikkinäistä visualisointia toisella visualisoinnilla
+
+**Mitä tapahtui:** Aikajanan soittopää liikkui 0,2 sekunnin vihjeellä 1,3 % eli
+pari pikseliä. Sen sijaan että olisin korjannut akselin, lisäsin soittonapin
+ympärille edistymisrenkaan näyttämään saman asian toisin. Käyttäjä sanoi
+renkaasta: *"ton napin ympäril on joku outo rinkula."*
+
+**Sääntö:** Kun mittari ei lue kunnolla, korjaa mittari. Toinen mittari sen
+viereen ei poista ensimmäisen vikaa — se vain lisää ruudulle tavaraa, ja
+käyttäjä näkee sen ylimääräisenä koristeena, koska se on sitä.
+
+**Miten sovellan:** Ennen kuin lisään uuden elementin selittämään olemassa
+olevaa, kysyn: *miksi se olemassa oleva ei kerro tätä itse?* Jos vastaus on
+"koska sen mittakaava on väärä", korjaan mittakaavan.
+
+## 9. Selaimen tapahtumat saapuvat myöhässä — vartioi jaettu tila
+
+**Mitä tapahtui:** `AudioBufferSourceNode.stop()` laukaisee `onended`-tapahtuman
+vasta tapahtumasilmukassa. Kun pelaaja painoi Pysäytä ja heti Soita, edellisen
+klipin lopetuskoodi ehti nollata *uuden* klipin tilan. Soitin ei enää tuntenut
+omaa ääntään: Pysäytä ei pysäyttänyt, jana ei liikkunut.
+
+**Sääntö:** Kun `await` päättyy, mikään luokan kentistä ei ole enää varmasti
+sama kuin ennen odotusta. Leimaa jokainen asynkroninen operaatio juoksevalla
+numerolla ja tarkista se ennen kuin kosket jaettuun tilaan.
+
+**Tarkistus:** Tällaista ei näe koodia lukemalla — se vaatii testin joka
+pysäyttää ja aloittaa uudelleen samassa vuorossa (`scripts/audiotest.ts`).

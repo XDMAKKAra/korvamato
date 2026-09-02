@@ -44,6 +44,16 @@ class ClipPlayer {
   private gain: GainNode | null = null
   /** Varatoteutuksen soittolupauksen ratkaisija, jotta ajastuksen voi uusia. */
   private fallbackResolve: (() => void) | null = null
+  /**
+   * Juokseva numero jokaiselle soittopyynnölle.
+   *
+   * `stop()` laukaisee edellisen lähteen `onended`-tapahtuman, mutta se saapuu
+   * vasta tapahtumasilmukassa – siis mahdollisesti vasta kun seuraava klippi on
+   * jo käynnissä. Ilman tätä numeroa edellisen soiton lopetuskoodi nollaisi
+   * *uuden* klipin tilan, jolloin soitin ei enää tunne omaa ääntään: rengas ei
+   * liiku, `stop()` ei pysäytä mitään ja `extend()` kieltäytyy pidentämästä.
+   */
+  private generation = 0
 
   /** Varajärjestelmä selaimille jotka eivät dekoodaa AAC:tä Web Audiolla. */
   private useFallback = false
@@ -122,6 +132,7 @@ class ClipPlayer {
 
   /** Soittaa `seconds` sekuntia biisin alusta. Palautuu kun klippi loppuu. */
   async play(song: Song, seconds: number): Promise<void> {
+    const gen = ++this.generation
     this.stop()
 
     if (!this.useFallback) {
@@ -163,10 +174,15 @@ class ClipPlayer {
           await new Promise<void>((resolve) => {
             src.onended = () => resolve()
           })
-          this.source = null
-          this.gain = null
-          this.playingId = null
-          this.clipStartCtxTime = null
+          // Puretaan vain jos tämä soitto on yhä uusin. Muuten nollattaisiin
+          // seuraavan klipin tila (ks. `generation`).
+          if (this.generation === gen) {
+            this.source = null
+            this.gain = null
+            this.playingId = null
+            this.clipStartCtxTime = null
+            this.clipDuration = 0
+          }
           return
         }
       }
