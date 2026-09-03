@@ -87,6 +87,44 @@ interface Scored<T> {
   score: number
 }
 
+interface NormalizedEntry {
+  artist: string
+  title: string
+  both: string
+  all: string
+  guests: string[]
+}
+
+/**
+ * Normalisointi (Unicode NFD -purku + useampi regex) maksaa mitattuna
+ * 31 000 rivin hakuluettelolla n. 300 ms per kutsu. Ilman välimuistia se
+ * ajettaisiin joka näppäimenpainalluksella jokaiselle riville uudestaan,
+ * jolloin kirjoittaminen jää jälkeen: näppäily jonoutuu ja kentän teksti
+ * tuntuu ilmestyvän vasta sekuntien viiveellä. Rivin sisältö ei muutu
+ * kesken pelin, joten normalisoitu muoto lasketaan vain kerran per rivi ja
+ * muistetaan WeakMapissa – uusi näppäily lukee sen sijaan vain valmiin
+ * tuloksen.
+ */
+const normalizedCache = new WeakMap<Searchable, NormalizedEntry>()
+
+function normalizedEntry(song: Searchable): NormalizedEntry {
+  const cached = normalizedCache.get(song)
+  if (cached) return cached
+  const artist = normalize(song.artist)
+  const title = normalize(song.title)
+  const entry: NormalizedEntry = {
+    artist,
+    title,
+    both: `${artist} ${title}`,
+    // Haku osuu myös feat-vieraisiin, joten "sara bee" löytää
+    // "Elastinen – Uskomaton (feat. Sara Bee)".
+    all: haystack(song),
+    guests: (song.artists ?? []).slice(1).map(normalize),
+  }
+  normalizedCache.set(song, entry)
+  return entry
+}
+
 /**
  * Hakee biisejä vapaalla tekstillä. Osuu sekä artistiin että biisin nimeen,
  * ja sietää kirjoitusasun heitot ("kaarija" löytää Käärijän).
@@ -99,13 +137,7 @@ export function searchSongs<T extends Searchable>(query: string, songs: T[], lim
   const out: Scored<T>[] = []
 
   for (const song of songs) {
-    const artist = normalize(song.artist)
-    const title = normalize(song.title)
-    const both = `${artist} ${title}`
-    // Haku osuu myös feat-vieraisiin, joten "sara bee" löytää
-    // "Elastinen – Uskomaton (feat. Sara Bee)".
-    const all = haystack(song)
-    const guests = (song.artists ?? []).slice(1).map(normalize)
+    const { artist, title, both, all, guests } = normalizedEntry(song)
 
     let score = 0
 
@@ -159,7 +191,8 @@ export function searchSongs<T extends Searchable>(query: string, songs: T[], lim
   const seen = new Set<string>()
   const unique: T[] = []
   for (const { song } of out) {
-    const key = `${normalize(song.artist)}|${normalize(song.title)}`
+    const { artist, title } = normalizedEntry(song)
+    const key = `${artist}|${title}`
     if (seen.has(key)) continue
     seen.add(key)
     unique.push(song)
