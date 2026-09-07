@@ -10,7 +10,7 @@ hear is **0.1 seconds long**. Every wrong guess or skip buys you a longer one.
 Five attempts per song. The shorter the clip you name it from, the more points you
 score, multiplied by difficulty (easy ×1 … impossible ×3). A perfect round is 8,750.
 
-There is a daily challenge — the same five songs for everyone, rotating at midnight —
+There is a daily challenge, the same five songs for everyone, rotating at midnight,
 and an unlimited mode where you can filter by era (2020s / 2010s / classics 1970–2010)
 and genre (rock, rap, pop, iskelmä). Results share as a grid of emoji squares.
 Spacebar plays the clip.
@@ -44,17 +44,17 @@ backend, no database.
 
 The pipeline in `scripts/build-library.mjs` never reads a list of tracks. It finds them:
 
-1. **Artist seed** — the only hand-maintained data is artist *names*, never songs. They
+1. **Artist seed**: the only hand-maintained data is artist *names*, never songs. They
    come from a 141-artist seed file, Apple's Finnish top-charts (re-fetched on every run,
    so new Finnish artists appear on their own), plus supplementary seeds for iskelmä,
    rap and 2020s rock.
-2. **Catalogue expansion** — each artist's full Apple Music catalogue is pulled
+2. **Catalogue expansion**: each artist's full Apple Music catalogue is pulled
    (`lookup?entity=song&limit=200`). This is the multiplier that turns ~200 artists into
    3,000+ tracks.
-3. **Filtering** — karaoke, tribute, cover, instrumental, live, remix and demo versions,
+3. **Filtering**: karaoke, tribute, cover, instrumental, live, remix and demo versions,
    intros, skits, medleys (several songs in one track, unguessable by construction),
    duplicates and anything missing a preview clip.
-4. **Difficulty is scored from data, not assigned by hand** — chart position, single
+4. **Difficulty is scored from data, not assigned by hand**: chart position, single
    release, membership in the original curated set, and catalogue size, bucketed into
    five levels by quantile.
 
@@ -71,7 +71,7 @@ The pipeline in `scripts/build-library.mjs` never reads a list of tracks. It fin
   Fredi and Fintelligens side by side, which is not iskelmä). So iskelmä is the one genre
   resolved through the artist seed instead.
 - **Nationality is not in the API**, so international artists are dropped from the FI
-  chart with a small blocklist matched against name fragments — which also catches
+  chart with a small blocklist matched against name fragments, which also catches
   collaborations like "LE SSERAFIM, ILLIT & KATSEYE".
 
 ### 2. Playing a 0.1-second clip accurately
