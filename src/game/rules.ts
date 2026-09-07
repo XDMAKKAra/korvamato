@@ -39,7 +39,7 @@ export function scoreFor(tier: number, stageIndex: number): number {
   return Math.round(STAGE_POINTS[stageIndex] * tierInfo(tier).mult)
 }
 
-/** Suurin mahdollinen tulos: kaikki viisi biisiä 0,1 sekunnista. */
+/** Suurin mahdollinen tulos: kaikki viisi biisiä 0,2 sekunnista. */
 export const MAX_SCORE = TIERS.reduce((sum, t) => sum + Math.round(STAGE_POINTS[0] * t.mult), 0)
 
 /**

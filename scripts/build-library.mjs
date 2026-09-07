@@ -1,10 +1,10 @@
 /**
  * Rakentaa pelin biisikannan (src/data/songs.json) Last.fm:n varaan.
  *
- * Putki (katso tasks/todo.md ja projektin CLAUDE.md-ohje uudistuksen syistä):
+ * Putki:
  *
  *   1. LÖYTÄMINEN TAGEILLA (scripts/lastfm.mjs: tagTopTracks/tagTopArtists).
- *      Tämä korvaa käsin poimitut soittolistat — samat tagit toimivat kuin
+ *      Tämä korvaa käsin poimitut soittolistat. Samat tagit toimivat kuin
  *      soittolistan haku, mutta rajapinta on vakaa ja avoin.
  *   2. ARTISTIN LAAJENNUS (artistTopTracks, limit=50): jokaiselle löydetylle
  *      suomalaiselle artistille haetaan hänen KUUNNELLUIMMAT kappaleensa,
