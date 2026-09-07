@@ -20,3 +20,7 @@ data/.pipeline-*.json
 
 # Vercel
 .vercel
+
+# Local agent tooling and internal notes
+claude.md
+tasks/
